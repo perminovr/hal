@@ -33,7 +33,7 @@ extern "C" {
  *
  * \return the system time with millisecond resolution.
  */
-PAL_API uint64_t
+HAL_API uint64_t
 Hal_getTimeInMs(void);
 
 

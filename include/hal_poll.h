@@ -116,7 +116,7 @@ struct sPollfd {
  * \return the number of file descriptors with events, zero if timed out,
  *  or -1 for errors.
 */
-PAL_API int
+HAL_API int
 Hal_poll(Pollfd pfd, unsigned long int size, int timeout);
 
 
@@ -132,7 +132,7 @@ typedef struct sHalPoll *HalPoll;
  *
  * \return a new HalPoll instance.
 */
-PAL_API HalPoll
+HAL_API HalPoll
 HalPoll_create(int maxSize);
 
 /**
@@ -147,7 +147,7 @@ HalPoll_create(int maxSize);
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update(HalPoll self, unidesc fd, int events, void *object, void *user, PollfdReventsHandler handler);
 
 /**
@@ -159,7 +159,7 @@ HalPoll_update(HalPoll self, unidesc fd, int events, void *object, void *user, P
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_1(HalPoll self, unidesc fd, int events);
 
 /**
@@ -171,7 +171,7 @@ HalPoll_update_1(HalPoll self, unidesc fd, int events);
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_2(HalPoll self, unidesc fd, void *object);
 
 /**
@@ -184,7 +184,7 @@ HalPoll_update_2(HalPoll self, unidesc fd, void *object);
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandler handler);
 
 /**
@@ -196,7 +196,7 @@ HalPoll_update_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandler hand
  *
  * \return true in case of success, false otherwise
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_4(HalPoll self, unidesc old_fd, unidesc new_fd);
 
 #ifdef HALCPPDEFINED
@@ -212,7 +212,7 @@ HalPoll_update_4(HalPoll self, unidesc old_fd, unidesc new_fd);
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_cpp(HalPoll self, unidesc fd, int events, void *object, void *user, PollfdReventsHandlerCpp handler);
 
 /**
@@ -225,7 +225,7 @@ HalPoll_update_cpp(HalPoll self, unidesc fd, int events, void *object, void *use
  *
  * \return true in case of success, false then maximum size of the poll queue was reached
 */
-PAL_API bool
+HAL_API bool
 HalPoll_update_cpp_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandlerCpp handler);
 #endif // HALCPPDEFINED
 
@@ -237,7 +237,7 @@ HalPoll_update_cpp_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandlerC
  *
  * \return true in case of success, false then descriptor is invalid or the poll queue does not contain this descriptor
 */
-PAL_API bool
+HAL_API bool
 HalPoll_remove(HalPoll self, unidesc fd);
 
 /**
@@ -248,7 +248,7 @@ HalPoll_remove(HalPoll self, unidesc fd);
  *
  * \return -1 on error ; 0 on timeout ; >0 on events
 */
-PAL_API int
+HAL_API int
 HalPoll_wait(HalPoll self, int timeout);
 
 /**
@@ -256,7 +256,7 @@ HalPoll_wait(HalPoll self, int timeout);
  *
  * \param self - a HalPoll instance
 */
-PAL_API void
+HAL_API void
 HalPoll_destroy(HalPoll self);
 
 

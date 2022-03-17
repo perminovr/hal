@@ -41,7 +41,7 @@ typedef struct sTimer *Timer;
  *
  * \return a new Timer instance.
 */
-PAL_API Timer
+HAL_API Timer
 Timer_create(void);
 
 /**
@@ -51,7 +51,7 @@ Timer_create(void);
  *
  * \return true in case of success, false otherwise
 */
-PAL_API bool
+HAL_API bool
 Timer_setTimeout(Timer self, AccurateTime_t *timeout);
 
 /**
@@ -59,7 +59,7 @@ Timer_setTimeout(Timer self, AccurateTime_t *timeout);
  *
  * \return true in case of success, false otherwise
 */
-PAL_API bool
+HAL_API bool
 Timer_repeatTimeout(Timer self);
 
 /**
@@ -69,7 +69,7 @@ Timer_repeatTimeout(Timer self);
  *
  * \return true in case of success, false otherwise
 */
-PAL_API bool
+HAL_API bool
 Timer_setPeriod(Timer self, AccurateTime_t *period);
 
 /**
@@ -77,7 +77,7 @@ Timer_setPeriod(Timer self, AccurateTime_t *period);
  *
  * \return true in case of success, false otherwise
 */
-PAL_API bool
+HAL_API bool
 Timer_stop(Timer self);
 
 /**
@@ -85,19 +85,19 @@ Timer_stop(Timer self);
  *
  * \return true in case of success, false otherwise
 */
-PAL_API void
+HAL_API void
 Timer_endEvent(Timer self);
 
 /**
  * \brief Destroy Timer instance
 */
-PAL_API void
+HAL_API void
 Timer_destroy(Timer self);
 
 /**
  * \brief Get the system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 Timer_getDescriptor(Timer self);
 
 
@@ -106,13 +106,13 @@ Timer_getDescriptor(Timer self);
  *
  * \return the system descriptor
 */
-PAL_API unidesc
+HAL_API unidesc
 Timer_setSingleShot(AccurateTime_t *time);
 
 /**
  * \brief End single shot timeout
 */
-PAL_API void
+HAL_API void
 Timer_endSingleShot(unidesc desc);
 
 

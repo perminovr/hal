@@ -71,7 +71,7 @@ union uClientSocketAddress {
  *
  * \return the newly create ServerSocket instance
  */
-PAL_API ServerSocket
+HAL_API ServerSocket
 TcpServerSocket_create(int maxConnections, const char *address, uint16_t port);
 
 /**
@@ -82,7 +82,7 @@ TcpServerSocket_create(int maxConnections, const char *address, uint16_t port);
  *
  * \return a new client socket instance.
  */
-PAL_API ClientSocket
+HAL_API ClientSocket
 TcpClientSocket_createAndBind(const char *ip, uint16_t port);
 
 /**
@@ -90,7 +90,7 @@ TcpClientSocket_createAndBind(const char *ip, uint16_t port);
  *
  * \return a new client socket instance.
  */
-PAL_API ClientSocket
+HAL_API ClientSocket
 TcpClientSocket_create(void);
 
 /**
@@ -101,7 +101,7 @@ TcpClientSocket_create(void);
  * \param interval time (in s) between subsequent keep alive messages if no ACK received
  * \param count number of not missing keep alive ACKs until socket is considered dead
  */
-PAL_API void
+HAL_API void
 TcpClientSocket_activateTcpKeepAlive(ClientSocket self, int idleTime, int interval, int count);
 
 /**
@@ -109,7 +109,7 @@ TcpClientSocket_activateTcpKeepAlive(ClientSocket self, int idleTime, int interv
  *
  * \param self server socket instance
  */
-PAL_API void
+HAL_API void
 TcpClientSocket_activateTcpNoDelay(ClientSocket self);
 
 /**
@@ -122,7 +122,7 @@ TcpClientSocket_activateTcpNoDelay(ClientSocket self);
  * \param self server socket instance
  * \param timeoutInMs the timeout in ms
  */
-PAL_API void
+HAL_API void
 TcpClientSocket_setUnacknowledgedTimeout(ClientSocket self, int timeoutInMs);
 
 
@@ -134,7 +134,7 @@ TcpClientSocket_setUnacknowledgedTimeout(ClientSocket self, int timeoutInMs);
  *
  * \return the newly create ServerSocket instance
  */
-PAL_API ServerSocket
+HAL_API ServerSocket
 LocalServerSocket_create(int maxConnections, const char *address);
 
 /**
@@ -142,7 +142,7 @@ LocalServerSocket_create(int maxConnections, const char *address);
  *
  * \return a new client socket instance.
  */
-PAL_API ClientSocket
+HAL_API ClientSocket
 LocalClientSocket_create(void);
 
 
@@ -154,7 +154,7 @@ LocalClientSocket_create(void);
  *
  * \param pending size of connection queue (may be unused)
  */
-PAL_API void
+HAL_API void
 ServerSocket_listen(ServerSocket self, int pending);
 
 /**
@@ -167,7 +167,7 @@ ServerSocket_listen(ServerSocket self, int pending);
  *
  * \return handle of the new connection socket or NULL if no new connection is available
  */
-PAL_API ClientSocket
+HAL_API ClientSocket
 ServerSocket_accept(ServerSocket self);
 
 /**
@@ -177,7 +177,7 @@ ServerSocket_accept(ServerSocket self);
  *
  * \return number of server clients
  */
-PAL_API int
+HAL_API int
 ServerSocket_getClientsNumber(ServerSocket self);
 
 /**
@@ -187,7 +187,7 @@ ServerSocket_getClientsNumber(ServerSocket self);
  *
  * \return head of the clients list
  */
-PAL_API ServerClient
+HAL_API ServerClient
 ServerSocket_getClients(ServerSocket self);
 
 /**
@@ -201,13 +201,13 @@ ServerSocket_getClients(ServerSocket self);
  *
  * \return true in case of success, false otherwise (there are the active clients)
  */
-PAL_API bool
+HAL_API bool
 ServerSocket_destroy(ServerSocket self);
 
 /**
  * \brief Get the system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 ServerSocket_getDescriptor(ServerSocket self);
 
 
@@ -223,7 +223,7 @@ ServerSocket_getDescriptor(ServerSocket self);
  *
  * \return true if the connection was established successfully, false otherwise
  */
-PAL_API bool
+HAL_API bool
 ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, uint32_t timeoutInMs);
 
 /**
@@ -236,7 +236,7 @@ ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, uint3
  *
  * \return true if on connecting state or the connection was established successfully, false otherwise
  */
-PAL_API bool
+HAL_API bool
 ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress address);
 
 /**
@@ -248,7 +248,7 @@ ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress address);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 ClientSocket_reset(ClientSocket self);
 
 /**
@@ -256,7 +256,7 @@ ClientSocket_reset(ClientSocket self);
  *
  * \param self the client socket instance
  */
-PAL_API ClientSocketState
+HAL_API ClientSocketState
 ClientSocket_checkConnectState(ClientSocket self);
 
 /**
@@ -271,7 +271,7 @@ ClientSocket_checkConnectState(ClientSocket self);
  *
  * \return the number of bytes read or -1 if an error occurred
  */
-PAL_API int
+HAL_API int
 ClientSocket_read(ClientSocket self, uint8_t *buf, int size);
 
 /**
@@ -283,7 +283,7 @@ ClientSocket_read(ClientSocket self, uint8_t *buf, int size);
  *
  * \return number of bytes transmitted of -1 in case of an error
  */
-PAL_API int
+HAL_API int
 ClientSocket_write(ClientSocket self, const uint8_t *buf, int size);
 
 /**
@@ -294,7 +294,7 @@ ClientSocket_write(ClientSocket self, const uint8_t *buf, int size);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 ClientSocket_getPeerAddress(ClientSocket self, ClientSocketAddress address);
 
 /**
@@ -305,7 +305,7 @@ ClientSocket_getPeerAddress(ClientSocket self, ClientSocketAddress address);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address);
 
 /**
@@ -316,13 +316,13 @@ ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address);
  *
  * \param self the client socket instance
  */
-PAL_API void
+HAL_API void
 ClientSocket_destroy(ClientSocket self);
 
 /**
  * \brief Get the system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 ClientSocket_getDescriptor(ClientSocket self);
 
 

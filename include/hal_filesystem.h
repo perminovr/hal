@@ -33,7 +33,7 @@ typedef void *DirectoryHandle;
  * \return a handle for the file. Has to be used by subsequent calls to file functions to identify the file or
  *		 NULL if opening fails
  */
-PAL_API FileHandle
+HAL_API FileHandle
 FileSystem_openFile(const char *pathName, bool readWrite);
 
 /**
@@ -50,7 +50,7 @@ FileSystem_openFile(const char *pathName, bool readWrite);
  *
  * \return the number of bytes actually read
  */
-PAL_API int
+HAL_API int
 FileSystem_readFile(FileHandle handle, uint8_t *buffer, int maxSize);
 
 /**
@@ -66,7 +66,7 @@ FileSystem_readFile(FileHandle handle, uint8_t *buffer, int maxSize);
  *
  * \return the number of bytes actually read
  */
-PAL_API int
+HAL_API int
 FileSystem_readFileOffs(FileHandle handle, long offset, uint8_t *buffer, int maxSize);
 
 /**
@@ -78,7 +78,7 @@ FileSystem_readFileOffs(FileHandle handle, long offset, uint8_t *buffer, int max
  *
  * \return the number of bytes actually written
  */
-PAL_API int
+HAL_API int
 FileSystem_writeFile(FileHandle handle, uint8_t *buffer, int size);
 
 /**
@@ -86,7 +86,7 @@ FileSystem_writeFile(FileHandle handle, uint8_t *buffer, int size);
  *
  * \param handle the file handle to identify the file
  */
-PAL_API void
+HAL_API void
 FileSystem_closeFile(FileHandle handle);
 
 /**
@@ -102,7 +102,7 @@ FileSystem_closeFile(FileHandle handle);
  *
  * \return true if file exists, false if not
  */
-PAL_API bool
+HAL_API bool
 FileSystem_getFileInfo(const char *filename, uint32_t *fileSize, uint64_t *lastModificationTimestamp);
 
 /**
@@ -112,7 +112,7 @@ FileSystem_getFileInfo(const char *filename, uint32_t *fileSize, uint64_t *lastM
  *
  * \return true on success, false on error
  */
-PAL_API bool
+HAL_API bool
 FileSystem_deleteFile(const char *filename);
 
 /**
@@ -123,7 +123,7 @@ FileSystem_deleteFile(const char *filename);
  *
  * \return true on success, false on error
  */
-PAL_API bool
+HAL_API bool
 FileSystem_renameFile(const char *oldFilename, const char *newFilename);
 
 /**
@@ -133,7 +133,7 @@ FileSystem_renameFile(const char *oldFilename, const char *newFilename);
  *
  * \return a handle for the opened directory to be used in subsequent calls to identify the directory
  */
-PAL_API DirectoryHandle
+HAL_API DirectoryHandle
 FileSystem_openDirectory(const char *directoryName);
 
 /**
@@ -148,7 +148,7 @@ FileSystem_openDirectory(const char *directoryName);
  *
  * \return the name of the directory entry
  */
-PAL_API char *
+HAL_API const char *
 FileSystem_readDirectory(DirectoryHandle directory, bool *isDirectory);
 
 
@@ -157,7 +157,7 @@ FileSystem_readDirectory(DirectoryHandle directory, bool *isDirectory);
  *
  * \param directory the handle to identify the directory
  */
-PAL_API void
+HAL_API void
 FileSystem_closeDirectory(DirectoryHandle directory);
 
 /**
@@ -167,7 +167,7 @@ FileSystem_closeDirectory(DirectoryHandle directory);
  *
  * \return true on success, false on error
  */
-PAL_API bool
+HAL_API bool
 FileSystem_createDirectory(const char *directoryName);
 
 

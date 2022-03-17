@@ -53,7 +53,7 @@ union uDgramSocketAddress {
  *
  * \return a new udp socket instance.
  */
-PAL_API DgramSocket
+HAL_API DgramSocket
 UdpDgramSocket_createAndBind(const char *ip, uint16_t port);
 
 /**
@@ -61,7 +61,7 @@ UdpDgramSocket_createAndBind(const char *ip, uint16_t port);
  *
  * \return a new socket instance.
  */
-PAL_API DgramSocket
+HAL_API DgramSocket
 UdpDgramSocket_create(void);
 
 /**
@@ -73,7 +73,7 @@ UdpDgramSocket_create(void);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port);
 
 /**
@@ -85,7 +85,7 @@ UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *interface);
 
 /**
@@ -93,7 +93,7 @@ UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *interface
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 UdpDgramSocket_setReuse(DgramSocket self, bool reuse);
 
 
@@ -104,7 +104,7 @@ UdpDgramSocket_setReuse(DgramSocket self, bool reuse);
  *
  * \return a new socket instance.
  */
-PAL_API DgramSocket
+HAL_API DgramSocket
 LocalDgramSocket_create(const char *address);
 
 /**
@@ -112,7 +112,7 @@ LocalDgramSocket_create(const char *address);
  *
  * \param address the address of the local socket
  */
-PAL_API void
+HAL_API void
 LocalDgramSocket_unlinkAddress(const char *address);
 
 
@@ -125,7 +125,7 @@ LocalDgramSocket_unlinkAddress(const char *address);
  *
  * \return a new socket instance.
  */
-PAL_API DgramSocket
+HAL_API DgramSocket
 EtherDgramSocket_create(const char *interface, uint16_t ethTypeFilter);
 
 /**
@@ -138,7 +138,7 @@ EtherDgramSocket_create(const char *interface, uint16_t ethTypeFilter);
  *
  * \return header len (always 14)
  */
-PAL_API int
+HAL_API int
 EtherDgramSocket_setHeader(uint8_t *header, const uint8_t *src, const uint8_t *dst, uint16_t ethType);
 
 /**
@@ -149,7 +149,7 @@ EtherDgramSocket_setHeader(uint8_t *header, const uint8_t *src, const uint8_t *d
  * \param dst storage fordestination mac address. At least 6 bytes length
  * \param ethType storage for ethernet frame type
  */
-PAL_API void
+HAL_API void
 EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, uint16_t *ethType);
 
 /**
@@ -162,7 +162,7 @@ EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, ui
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 EtherDgramSocket_getInterfaceMACAddress(const char *interface, uint8_t *addr);
 
 /**
@@ -175,7 +175,7 @@ EtherDgramSocket_getInterfaceMACAddress(const char *interface, uint8_t *addr);
  *
  * \return pointer to addr in case of success, NULL otherwise
  */
-PAL_API uint8_t *
+HAL_API uint8_t *
 EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr);
 
 
@@ -188,7 +188,7 @@ EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr);
  * \param self the socket instance
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 DgramSocket_reset(DgramSocket self);
 
 /**
@@ -197,7 +197,7 @@ DgramSocket_reset(DgramSocket self);
  * \param self the socket instance
  * \param addr destination address (protocol specific)
  */
-PAL_API void
+HAL_API void
 DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr);
 
 /**
@@ -206,7 +206,7 @@ DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr);
  * \param self the socket instance
  * \param addr destination address (protocol specific)
  */
-PAL_API void
+HAL_API void
 DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr);
 
 /**
@@ -224,7 +224,7 @@ DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr);
  *
  * \return the number of bytes read or -1 if an error occurred
  */
-PAL_API int
+HAL_API int
 DgramSocket_read(DgramSocket self, uint8_t *buf, int size);
 
 /**
@@ -238,7 +238,7 @@ DgramSocket_read(DgramSocket self, uint8_t *buf, int size);
  *
  * \return number of bytes transmitted of -1 in case of an error
  */
-PAL_API int
+HAL_API int
 DgramSocket_write(DgramSocket self, const uint8_t *buf, int size);
 
 /**
@@ -254,7 +254,7 @@ DgramSocket_write(DgramSocket self, const uint8_t *buf, int size);
  *
  * \return the number of bytes read or -1 if an error occurred
  */
-PAL_API int
+HAL_API int
 DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size);
 
 /**
@@ -267,7 +267,7 @@ DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, in
  *
  * \return number of bytes transmitted of -1 in case of an error
  */
-PAL_API int
+HAL_API int
 DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size);
 
 /**
@@ -278,13 +278,13 @@ DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8
  *
  * \param self the socket instance
  */
-PAL_API void
+HAL_API void
 DgramSocket_destroy(DgramSocket self);
 
 /**
  * \brief Get the system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 DgramSocket_getDescriptor(DgramSocket self);
 
 

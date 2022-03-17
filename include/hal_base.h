@@ -47,21 +47,21 @@
 # endif
 #endif
 
-#if defined _WIN32 || defined __CYGWIN__
+#if defined _WIN32 || defined _WIN64 || defined __CYGWIN__
 # ifdef EXPORT_FUNCTIONS_FOR_DLL
-#  define PAL_API __declspec(dllexport)
+#  define HAL_API __declspec(dllexport)
 # else
-#  define PAL_API
+#  define HAL_API /*__declspec(dllimport)*/
 #endif
 
-#define PAL_INTERNAL
+#define HAL_INTERNAL
 #else
 # if __GNUC__ >= 4
-#  define PAL_API extern __attribute__ ((visibility ("default")))
-#  define PAL_INTERNAL  __attribute__ ((visibility ("hidden")))
+#  define HAL_API extern __attribute__ ((visibility ("default")))
+#  define HAL_INTERNAL  __attribute__ ((visibility ("hidden")))
 # else
-#  define PAL_API
-#  define PAL_INTERNAL
+#  define HAL_API
+#  define HAL_INTERNAL
 # endif
 #endif
 
@@ -84,13 +84,13 @@ typedef union {
 /**
  * \brief Get invalid descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 Hal_getInvalidUnidesc(void);
 
 /**
  * \brief Check descriptor for invalid value
  */
-PAL_API bool
+HAL_API bool
 Hal_unidescIsInvalid(unidesc p);
 
 /**
@@ -98,7 +98,7 @@ Hal_unidescIsInvalid(unidesc p);
  *
  * \return true if equal, false otherwise
  */
-PAL_API bool
+HAL_API bool
 Hal_unidescIsEqual(const unidesc *p1, const unidesc *p2);
 
 /**
@@ -106,7 +106,7 @@ Hal_unidescIsEqual(const unidesc *p1, const unidesc *p2);
  *
  * \return binary ip data in network byte order
  */
-PAL_API uint32_t
+HAL_API uint32_t
 Hal_ipv4StrToBin(const char *ip);
 
 #endif /* HAL_BASE_H */

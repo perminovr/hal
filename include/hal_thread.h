@@ -69,7 +69,7 @@ public:
  *
  * \return the newly created Thread instance
  */
-PAL_API Thread
+HAL_API Thread
 Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy);
 
 /**
@@ -80,7 +80,7 @@ Thread_create(size_t stackSize, ThreadExecutionFunction function, void *paramete
  *
  * \param thread the Thread instance to start
  */
-PAL_API void
+HAL_API void
 Thread_start(Thread thread);
 
 /**
@@ -88,106 +88,106 @@ Thread_start(Thread thread);
  *
  * \param thread the Thread instance to destroy
  */
-PAL_API void
+HAL_API void
 Thread_destroy(Thread thread);
 
 /**
  * \brief Suspend execution of the Thread for the specified number of milliseconds
  */
-PAL_API void
+HAL_API void
 Thread_sleep(int millies);
 
-PAL_API void
+HAL_API void
 Thread_yield(void);
 
 /**
  * \brief Send cancel signal to the thread
  */
-PAL_API void
+HAL_API void
 Thread_cancel(Thread thread);
 
 /**
  * \brief Check for cancel condition on the thread
  */
-PAL_API void
+HAL_API void
 Thread_testCancel(Thread thread);
 
 /**
  * \brief Return native system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 Thread_getNativeDescriptor(Thread thread);
 
 /**
  * \brief Set signal that will be raised on \ref Thread_cancel call
  */
-PAL_API void
+HAL_API void
 Thread_setCancelSignal(Thread thread, Signal signal);
 
 
-PAL_API Semaphore
+HAL_API Semaphore
 Semaphore_create(int initialValue);
 
 /* Wait until semaphore value is greater than zero. Then decrease the semaphore value. */
-PAL_API void
+HAL_API void
 Semaphore_wait(Semaphore self);
 
-PAL_API void
+HAL_API void
 Semaphore_post(Semaphore self);
 
-PAL_API void
+HAL_API void
 Semaphore_destroy(Semaphore self);
 
 
-PAL_API Mutex
+HAL_API Mutex
 Mutex_create(void);
 
-PAL_API void
+HAL_API void
 Mutex_lock(Mutex self);
 
-PAL_API int
+HAL_API int
 Mutex_trylock(Mutex self);
 
 /* Wait until lock becomes available, or specified time passes. */
-PAL_API int
+HAL_API int
 Mutex_timedlock(Mutex self, int millies);
 
-PAL_API void
+HAL_API void
 Mutex_unlock(Mutex self);
 
-PAL_API void
+HAL_API void
 Mutex_destroy(Mutex self);
 
 
-PAL_API SmartMutex
+HAL_API SmartMutex
 SmartMutex_create(void);
 
-PAL_API void
+HAL_API void
 SmartMutex_lock(SmartMutex self);
 
-PAL_API void
+HAL_API void
 SmartMutex_unlock(SmartMutex self);
 
-PAL_API void
+HAL_API void
 SmartMutex_destroy(SmartMutex self);
 
 
-PAL_API Signal
+HAL_API Signal
 Signal_create(void);
 
-PAL_API void
+HAL_API void
 Signal_raise(Signal self);
 
-PAL_API void
+HAL_API void
 Signal_end(Signal self);
 
-PAL_API bool
+HAL_API bool
 Signal_event(Signal self);
 
-PAL_API void
+HAL_API void
 Signal_destroy(Signal self);
 
-PAL_API unidesc
+HAL_API unidesc
 Signal_getNativeDescriptor(Signal self);
 
 

@@ -45,7 +45,7 @@ typedef enum {
  *
  * \return the new SerialPort instance
  */
-PAL_API SerialPort
+HAL_API SerialPort
 SerialPort_create(const char *interfaceName);
 
 /**
@@ -58,13 +58,13 @@ SerialPort_create(const char *interfaceName);
  *
  * \return true in case of success, false otherwise
  */
-PAL_API bool
+HAL_API bool
 SerialPort_reinit(SerialPort self, int baudRate, uint8_t dataBits, char parity, uint8_t stopBits);
 
 /**
  * \brief Destroy the SerialPort instance and release all resources
  */
-PAL_API void
+HAL_API void
 SerialPort_destroy(SerialPort self);
 
 /**
@@ -72,13 +72,13 @@ SerialPort_destroy(SerialPort self);
  *
  * \return true in case of success, false otherwise (use \ref SerialPort_getLastError for a detailed error code)
  */
-PAL_API bool
+HAL_API bool
 SerialPort_open(SerialPort self);
 
 /**
  * \brief Close (release) the serial interface
  */
-PAL_API void
+HAL_API void
 SerialPort_close(SerialPort self);
 
 /**
@@ -86,7 +86,7 @@ SerialPort_close(SerialPort self);
  *
  * \return the baud rate in baud
  */
-PAL_API int
+HAL_API int
 SerialPort_getBaudRate(SerialPort self);
 
 /**
@@ -94,13 +94,13 @@ SerialPort_getBaudRate(SerialPort self);
  *
  * \param timeout the timeout value in ms.
  */
-PAL_API void
+HAL_API void
 SerialPort_setTimeout(SerialPort self, int timeout);
 
 /**
  * \brief Discard all data in the input buffer of the serial interface
  */
-PAL_API void
+HAL_API void
 SerialPort_discardInBuffer(SerialPort self);
 
 /**
@@ -108,7 +108,7 @@ SerialPort_discardInBuffer(SerialPort self);
  *
  * \return number of read bytes of -1 in case of an error
  */
-PAL_API int
+HAL_API int
 SerialPort_readByte(SerialPort self);
 
 /**
@@ -119,7 +119,7 @@ SerialPort_readByte(SerialPort self);
  *
  * \return number of bytes readden, or -1 in case of an error
  */
-PAL_API int
+HAL_API int
 SerialPort_read(SerialPort self, uint8_t *buffer, int numberOfBytes);
 
 /**
@@ -130,19 +130,19 @@ SerialPort_read(SerialPort self, uint8_t *buffer, int numberOfBytes);
  *
  * \return number of bytes written, or -1 in case of an error
  */
-PAL_API int
+HAL_API int
 SerialPort_write(SerialPort self, uint8_t *buffer, int numberOfBytes);
 
 /**
  * \brief Get the error code of the last operation
  */
-PAL_API SerialPortError
+HAL_API SerialPortError
 SerialPort_getLastError(SerialPort self);
 
 /**
  * \brief Get the system descriptor
  */
-PAL_API unidesc
+HAL_API unidesc
 SerialPort_getDescriptor(SerialPort self);
 
 
