@@ -81,12 +81,12 @@ UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port);
  *
  * \param self the socket instance
  * \param ip ip v4 of the group
- * \param interface the ID of the Ethernet interface
+ * \param iface the ID of the Ethernet interface
  *
  * \return true in case of success, false otherwise
  */
 HAL_API bool
-UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *interface);
+UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *iface);
 
 /**
  * \brief Set reuse option for the socket
@@ -119,14 +119,14 @@ LocalDgramSocket_unlinkAddress(const char *address);
 /**
  * \brief Create a ethernet socket
  *
- * \param interface the ID of the Ethernet interface
+ * \param iface the ID of the Ethernet interface
  * \param ethTypeFilter ether type receiving filter. If parameter equals to zero,
  * when no filter is applied (all packets will be received)
  *
  * \return a new socket instance.
  */
 HAL_API DgramSocket
-EtherDgramSocket_create(const char *interface, uint16_t ethTypeFilter);
+EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter);
 
 /**
  * \brief Set ethernet frame header
@@ -157,13 +157,13 @@ EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, ui
  *
  * The result are the six bytes that make up the Ethernet MAC address.
  *
- * \param interface the ID of the Ethernet interface
+ * \param iface the ID of the Ethernet interface
  * \param addr pointer to a buffer to store the MAC address. At least 6 bytes length
  *
  * \return true in case of success, false otherwise
  */
 HAL_API bool
-EtherDgramSocket_getInterfaceMACAddress(const char *interface, uint8_t *addr);
+EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr);
 
 /**
  * \brief Return the MAC address of the socket.
@@ -269,6 +269,16 @@ DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, in
  */
 HAL_API int
 DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size);
+
+/**
+ * \brief Get the number of bytes available for reading from the socket
+ *
+ * \param self the socket instance
+ *
+ * \return the number of bytes available for reading or -1 if an error occurred
+ */
+HAL_API int
+DgramSocket_readAvailable(DgramSocket self);
 
 /**
  * \brief destroy a socket (after close the socket)

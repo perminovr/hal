@@ -1,45 +1,19 @@
 
-#ifdef __linux__
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
+#if defined(_WIN32) || defined(_WIN64)
 
 #include "hal_socket_dgram.h"
-#include <arpa/inet.h>
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <ifaddrs.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <netdb.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <pthread.h>
-#include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/eventfd.h>
-#include <sys/ioctl.h>
-#include <sys/io.h>
-#include <sys/mman.h>
-#include <sys/poll.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <time.h>
-#include <unistd.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#include <netioapi.h>
+#include <windows.h>
+
+#define ETH_ALEN	6
+#define AF_PACKET	17 // yeah, netbios...
 
 
 struct sDgramSocket {
-	int fd;
+	SOCKET s;
 	int domain;
 	union uDgramSocketAddress remote;
 	int ifidx;
@@ -48,20 +22,20 @@ struct sDgramSocket {
 
 
 static bool prepareSocketAddress(const char *address, uint16_t port, struct sockaddr_in *sockaddr);
-static char *inet_paddr(in_addr_t in, char *out);
+static char *inet_paddr(uint32_t in, char *out);
 
 
-static inline void setSocketNonBlocking(int fd)
+static inline void setSocketNonBlocking(SOCKET s)
 {
-	int flags = fcntl(fd, F_GETFL, 0);
-	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	u_long val = 1;
+	ioctlsocket(s, FIONBIO, &val);
 }
 
-static inline int getSocketAvailableToRead(int fd)
+static inline int getSocketAvailableToRead(SOCKET s)
 {
-    int val = 0;
-	if (ioctl(fd, FIONREAD, &val) == 0) {
-		return val;
+    u_long val = 0;
+	if (ioctlsocket(s, FIONREAD, &val) == 0) {
+		return (int)val;
 	}
 	return -1;
 }
@@ -69,30 +43,30 @@ static inline int getSocketAvailableToRead(int fd)
 
 DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 {
-	int fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd < 0) return NULL;
+	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == INVALID_SOCKET) return NULL;
 
 	if (ip || port) {
 		struct sockaddr_in addr;
 		if (!prepareSocketAddress(ip, port, &addr)) {
 			goto exit_error;
 		}
-		if (bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		if (bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) != 0) {
 			goto exit_error;
 		}
 	}
 
 	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
-		self->fd = fd;
+		self->s = sock;
 		self->domain = AF_INET;
 		self->protocol = -1;
-		setSocketNonBlocking(fd);
+		setSocketNonBlocking(sock);
 		return self;
 	}
 
 exit_error:
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
@@ -108,7 +82,7 @@ bool UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port)
 	if (!prepareSocketAddress(ip, port, &addr)) {
 		return false;
 	}
-	if (bind(self->fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+	if (bind(self->s, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) != 0) {
 		return false;
 	}
 	return true;
@@ -117,17 +91,17 @@ bool UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port)
 bool UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *iface)
 {
 	if (self == NULL || ip == NULL || iface == NULL) return false;
-	struct ip_mreqn imreqn;
+	struct ip_mreq_source imreqn;
 	struct ifreq ifr;
 	imreqn.imr_multiaddr.s_addr = inet_addr(ip);
-	imreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	imreqn.imr_ifindex = if_nametoindex(iface);
+	imreqn.imr_sourceaddr.s_addr = htonl(INADDR_ANY);
+	imreqn.imr_interface.s_addr = if_nametoindex(iface);
 	memset(&ifr, 0, sizeof(ifr));
 	strcpy(ifr.ifr_name, iface);
-	if (setsockopt(self->fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreqn, sizeof(struct ip_mreqn)) < 0) {
+	if (setsockopt(self->s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreqn, sizeof(struct ip_mreq_source)) != 0) {
 		return false;
 	}
-	if (setsockopt(self->fd, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(struct ifreq)) < 0) {
+	if (setsockopt(self->s, SOL_SOCKET, SO_BINDTODEVICE, &ifr, sizeof(struct ifreq)) != 0) {
 		return false;
 	}
 	return true;
@@ -137,7 +111,7 @@ bool UdpDgramSocket_setReuse(DgramSocket self, bool reuse)
 {
 	if (self == NULL) return false;
 	int sockopt = (reuse)? 1 : 0;
-	if (setsockopt(self->fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) {
+	if (setsockopt(self->s, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) != 0) {
 		return false;
 	}
 	return true;
@@ -147,29 +121,7 @@ bool UdpDgramSocket_setReuse(DgramSocket self, bool reuse)
 DgramSocket LocalDgramSocket_create(const char *address)
 {
 	if (address == NULL) return NULL;
-
-	int fd = socket(AF_UNIX, SOCK_DGRAM, 0);
-	if (fd < 0) return NULL;
-
-	struct sockaddr_un addr;
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, address);
-
-	if (bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) < 0) {
-		goto exit_error;
-	}
-
-	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
-	if (self) {
-		self->fd = fd;
-		self->domain = AF_UNIX;
-		self->protocol = -1;
-		setSocketNonBlocking(fd);
-		return self;
-	}
-
-exit_error:
-	close(fd);
+	// todo
 	return NULL;
 }
 
@@ -184,11 +136,8 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 {
 	if (iface == NULL) return NULL;
 
-	if (ethTypeFilter == 0) ethTypeFilter = ETH_P_ALL;
-	ethTypeFilter = htons(ethTypeFilter);
-
-	int fd = socket(AF_PACKET, SOCK_RAW, ethTypeFilter);
-	if (fd < 0) return NULL;
+	SOCKET sock = socket(AF_INET, SOCK_RAW, ethTypeFilter);
+	if (sock != INVALID_SOCKET) return NULL;
 
 	int idx;
 	int sockopt;
@@ -202,22 +151,22 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 	mreq.mr_type = PACKET_MR_PROMISC;
 
 	sockopt = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) goto exit_error;
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface, IFNAMSIZ-1) < 0) goto exit_error;
-	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) goto exit_error;
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) != 0) goto exit_error;
+	if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, iface, IFNAMSIZ-1) != 0) goto exit_error;
+	if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) != 0) goto exit_error;
 
 	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
-		self->fd = fd;
+		self->s = sock;
 		self->domain = AF_PACKET;
 		self->ifidx = idx;
 		self->protocol = ethTypeFilter;
-		setSocketNonBlocking(fd);
+		setSocketNonBlocking(sock);
 		return self;
 	}
 
 exit_error:
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
@@ -247,14 +196,14 @@ void EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *ds
 bool EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 {
 	if (iface == NULL || addr == NULL) return false;
-	int sock = socket(PF_INET, SOCK_DGRAM, 0);
+	int sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sock >= 0) {
-		struct ifreq ifr;
-		bzero(&ifr, sizeof(struct ifreq));
-		strncpy(ifr.ifr_name, iface, IFNAMSIZ-1);
-		ioctl(sock, SIOCGIFHWADDR, &ifr);
+		struct ifreq iface;
+		bzero(&iface, sizeof(struct ifreq));
+		strncpy(iface.ifr_name, iface, IFNAMSIZ-1);
+		ioctl(sock, SIOCGIFHWADDR, &iface);
 		close(sock);
-		memcpy(addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
+		memcpy(addr, iface.ifr_hwaddr.sa_data, ETH_ALEN);
 		return true;
 	}
 	return false;
@@ -263,11 +212,11 @@ bool EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 uint8_t *EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr)
 {
 	if (self == NULL || addr == NULL) return NULL;
-	if (self->fd >= 0) {
+	if (self->s != INVALID_SOCKET) {
 		struct ifreq iface;
 		bzero(&iface, sizeof(struct ifreq));
 		if_indextoname(self->ifidx, iface.ifr_name);
-		ioctl(self->fd, SIOCGIFHWADDR, &iface);
+		ioctl(self->s, SIOCGIFHWADDR, &iface);
 		memcpy(addr, iface.ifr_hwaddr.sa_data, ETH_ALEN);
 		return addr;
 	}
@@ -278,11 +227,11 @@ uint8_t *EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr)
 bool DgramSocket_reset(DgramSocket self)
 {
 	if (self == NULL) return false;
-	if (self->fd >= 0) {
-		close(self->fd);
+	if (self->s != INVALID_SOCKET) {
+		closesocket(self->s);
 		uint16_t protocol = (self->protocol != -1)? (uint16_t)self->protocol : 0;
-		self->fd = socket(self->domain, SOCK_DGRAM, protocol);
-		if (self->fd >= 0) {
+		self->s = socket(AF_INET, SOCK_DGRAM, protocol);
+		if (self->s != INVALID_SOCKET) {
 			return true;
 		}
 	}
@@ -292,9 +241,9 @@ bool DgramSocket_reset(DgramSocket self)
 bool DgramSocket_close(DgramSocket self) // hal internal use only
 {
 	if (self == NULL) return false;
-	if (self->fd >= 0) {
-		close(self->fd);
-		self->fd = -1;
+	if (self->s != INVALID_SOCKET) {
+		closesocket(self->s);
+		self->s = INVALID_SOCKET;
 	}
 }
 
@@ -327,7 +276,7 @@ int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf
 		} break;
 		default: break;
 	}
-	int rc = recvfrom(self->fd, buf, size, 0, (struct sockaddr *)&saddr, &addr_size);
+	int rc = recvfrom(self->s, buf, size, 0, (struct sockaddr *)&saddr, &addr_size);
 	if (rc > 0) {
 		switch (self->domain) {
 			case AF_INET: {
@@ -378,7 +327,7 @@ int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const u
 		} break;
 		default: break;
 	}
-	return sendto(self->fd, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
+	return sendto(self->s, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
 }
 
 int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
@@ -418,8 +367,8 @@ int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 
 int DgramSocket_readAvailable(DgramSocket self)
 {
-	if (self == NULL) return -1;
-	return getSocketAvailableToRead(self->fd);
+	if (self == NULL) return;
+	return getSocketAvailableToRead(self->s);
 }
 
 void DgramSocket_destroy(DgramSocket self)
@@ -433,7 +382,7 @@ unidesc DgramSocket_getDescriptor(DgramSocket self)
 {
 	if (self) {
 		unidesc ret;
-		ret.i32 = self->fd;
+		ret.u64 = (uint64_t)self->s;
 		return ret;
 	}
 	return Hal_getInvalidUnidesc();
@@ -471,7 +420,7 @@ static bool prepareSocketAddress(const char *address, uint16_t port, struct sock
 	return retVal;
 }
 
-static char *inet_paddr(in_addr_t in, char *out)
+static char *inet_paddr(uint32_t in, char *out)
 {
 	char *ret = 0;
 	union { uint32_t u32; uint8_t b[4]; } addr;
@@ -485,4 +434,4 @@ static char *inet_paddr(in_addr_t in, char *out)
 }
 
 
-#endif // __linux__
+#endif // _WIN32 || _WIN64

@@ -6,13 +6,13 @@
 
 bool Hal_unidescIsInvalid(unidesc p)
 {
-	return ((HANDLE)p.u64 == 0ULL)? true : false;
+	return (p.u64 == 0ULL)? true : false;
 }
 
 unidesc Hal_getInvalidUnidesc(void)
 {
 	unidesc p;
-	(HANDLE)p.u64 = 0ULL;
+	p.u64 = 0ULL;
 	return p;
 }
 

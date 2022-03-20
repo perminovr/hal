@@ -5,9 +5,9 @@
 #include <winsock2.h>
 
 
-static inline int poll( struct pollfd *pfd, int nfds, int timeout) 
-{ 
-	return WSAPoll ( pfd, nfds, timeout ); 
+static inline int poll( struct pollfd *pfd, unsigned long int nfds, int timeout) 
+{
+	return WSAPoll ( (LPWSAPOLLFD)pfd, (ULONG)nfds, (INT)timeout ); 
 }
 
 static inline int events_win_to_hal(SHORT pollev)
@@ -104,7 +104,7 @@ static inline int getFdIndex(HalPoll self, unidesc fd)
 {
 	int ret = 0;
 	for (; ret < self->size; ++ret) {
-		if (fd.u64 == self->pfd[ret].fd) {
+		if ((SOCKET)fd.u64 == self->pfd[ret].fd) {
 			break;
 		}
 	}
@@ -114,7 +114,7 @@ static inline int getFdIndex(HalPoll self, unidesc fd)
 
 static inline void setSysPollfd(HalPoll self, int idx, uint64_t fd, int events, int revents)
 {
-	self->pfd[idx].fd = fd;
+	self->pfd[idx].fd = (SOCKET)fd;
 	self->pfd[idx].events = events_hal_to_win(events);
 	self->pfd[idx].revents = events_hal_to_win(revents);
 }
@@ -282,7 +282,7 @@ int HalPoll_wait(HalPoll self, int timeout)
 
 	self->updated = false;
 	int handled = 0;
-	int res = poll(self->pfd, self->size, timeout);
+	int res = poll(self->pfd, (unsigned long int)self->size, timeout);
 
 	if (res <= 0) { return res; }
 

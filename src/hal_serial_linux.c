@@ -35,14 +35,14 @@ SerialPort SerialPort_create(const char *interfaceName)
 	SerialPort self = (SerialPort)calloc(1, sizeof(struct sSerialPort));
 	if (self != NULL) {
 		self->state = CREATED;
-		self->fd = -1;
+		// self->fd = -1; // todo
 		self->baudRate = 9600;
 		self->dataBits = 8;
 		self->stopBits = 1;
 		self->parity = 'N';
 		self->timeout.tv_sec = 0;
 		self->timeout.tv_usec = 100*1000;
-		strncpy(self->interfaceName, interfaceName, 31);
+		strncpy(self->interfaceName, interfaceName, sizeof(self->interfaceName)-1);
 		self->lastError = SERIAL_PORT_ERROR_NONE;
 	}
 	return self;
@@ -82,9 +82,10 @@ bool SerialPort_open(SerialPort self)
 {
 	if (self == NULL) return false;
 
-	self->fd = open(self->interfaceName, O_RDWR | O_NOCTTY | O_NDELAY | O_EXCL);
+	self->lastError = SERIAL_PORT_ERROR_NONE;
 
-	if (self->fd == -1) {
+	self->fd = open(self->interfaceName, O_RDWR | O_NOCTTY | O_NDELAY | O_EXCL);
+	if (self->fd < 0) {
 		self->lastError = SERIAL_PORT_ERROR_OPEN_FAILED;
 		return false;
 	}
@@ -134,10 +135,8 @@ bool SerialPort_open(SerialPort self)
 
 	/* Set baud rate */
 	if ((cfsetispeed(&tios, baudrate) < 0) || (cfsetospeed(&tios, baudrate) < 0)) {
-		close(self->fd);
-		self->fd = -1;
 		self->lastError = SERIAL_PORT_ERROR_INVALID_BAUDRATE;
-		return false;
+		goto exit_error;
     }
 
     /* Set data bits (5/6/7/8) */
@@ -168,14 +167,17 @@ bool SerialPort_open(SerialPort self)
     tios.c_iflag |= IGNPAR;
 
 	if (tcsetattr(self->fd, TCSANOW, &tios) < 0) {
-		close(self->fd);
-		self->fd = -1;
 		self->lastError = SERIAL_PORT_ERROR_INVALID_ARGUMENT;
-		return false;
+		goto exit_error;
 	}
 
 	self->state = OPENED;
 	return true;
+
+exit_error:
+	close(self->fd);
+	self->fd = -1;
+	return false;
 }
 
 void SerialPort_close(SerialPort self)
@@ -212,6 +214,7 @@ static int SerialPort_readByteTimeout(SerialPort self, struct timeval *timeout)
 int SerialPort_readByte(SerialPort self)
 {
 	if (self == NULL) return -1;
+	if (self->fd == -1) return -1;
 	struct timeval timeout = self->timeout;
 	return SerialPort_readByteTimeout(self, &timeout);
 }
@@ -219,6 +222,7 @@ int SerialPort_readByte(SerialPort self)
 int SerialPort_read(SerialPort self, uint8_t *buffer, int bufSize)
 {
 	if (self == NULL || buffer == NULL) return -1;
+	if (self->fd == -1) return -1;
 
 	int i;
 	int res;
@@ -240,6 +244,7 @@ int SerialPort_read(SerialPort self, uint8_t *buffer, int bufSize)
 int SerialPort_write(SerialPort self, uint8_t *buffer, int bufSize)
 {
 	if (self == NULL || buffer == NULL) return -1;
+	if (self->fd == -1) return -1;
 	self->lastError = SERIAL_PORT_ERROR_NONE;
 	ssize_t result = write(self->fd, buffer, bufSize);
 	tcdrain(self->fd);
@@ -248,9 +253,12 @@ int SerialPort_write(SerialPort self, uint8_t *buffer, int bufSize)
 
 unidesc SerialPort_getDescriptor(SerialPort self)
 {
-	unidesc ret;
-	ret.i32 = (self != NULL)? self->fd : -1;
-	return ret;
+	if (self) {
+		unidesc ret;
+		ret.i32 = self->fd;
+		return ret;
+	}
+	return Hal_getInvalidUnidesc();
 }
 
 int SerialPort_getBaudRate(SerialPort self)
@@ -262,6 +270,7 @@ int SerialPort_getBaudRate(SerialPort self)
 void SerialPort_discardInBuffer(SerialPort self)
 {
 	if (self == NULL) return;
+	if (self->fd == -1) return;
 	tcflush(self->fd, TCIOFLUSH);
 }
 

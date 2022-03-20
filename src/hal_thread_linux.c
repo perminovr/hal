@@ -51,7 +51,10 @@ void Semaphore_destroy(Semaphore self)
 Mutex Mutex_create(void)
 {
 	Mutex self = calloc(1, sizeof(pthread_mutex_t));
-	pthread_mutex_init((pthread_mutex_t*)self, 0);
+	pthread_mutexattr_t attr;
+	bzero(&attr, sizeof(pthread_mutexattr_t));
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init((pthread_mutex_t*)self, &attr);
 	return self;
 }
 
@@ -155,7 +158,7 @@ void Thread_yield(void)
 void Thread_cancel(Thread self)
 {
 	if (self == NULL) return;
-	if (!self->killSignal)
+	if (self->killSignal)
 		Signal_raise(self->killSignal);
 	if (!self->autodestroy)
 		pthread_cancel(self->pthread);
@@ -164,7 +167,7 @@ void Thread_cancel(Thread self)
 void Thread_testCancel(Thread self)
 {
 	if (self == NULL) return;
-	if (!self->killSignal)
+	if (self->killSignal)
 		Signal_end(self->killSignal);
 	if (!self->autodestroy)
 		pthread_testcancel();
@@ -181,51 +184,6 @@ void Thread_setCancelSignal(Thread self, Signal signal)
 {
 	if (self == NULL) return;
 	self->killSignal = signal;
-}
-
-
-struct sSmartMutex {
-	pthread_mutex_t mu;
-	pthread_t pth;
-	int depth;
-};
-
-SmartMutex SmartMutex_create(void)
-{
-	SmartMutex self = (SmartMutex)calloc(1, sizeof(struct sSmartMutex));
-	pthread_mutex_init(&self->mu, 0);
-	return self;
-}
-
-void SmartMutex_lock(SmartMutex self)
-{
-	if (self == NULL) return;
-	int rc = pthread_mutex_trylock(&self->mu);
-	if (rc != 0) { // failed to lock
-		if (self->pth != pthread_self()) { // another thread
-			pthread_mutex_lock(&self->mu); // lock then
-		}
-	} else { // locked
-		self->pth = pthread_self();
-	}
-	self->depth++;
-}
-
-void SmartMutex_unlock(SmartMutex self)
-{
-	if (self == NULL) return;
-	self->depth--;
-	if (self->depth <= 0) {
-		pthread_mutex_unlock(&self->mu);
-		self->pth = 0;
-	}
-}
-
-void SmartMutex_destroy(SmartMutex self)
-{
-	if (self == NULL) return;
-	pthread_mutex_destroy(&self->mu);
-	free(self);
 }
 
 
@@ -275,11 +233,14 @@ void Signal_destroy(Signal self)
 	free(self);
 }
 
-unidesc Signal_getNativeDescriptor(Signal self)
+unidesc Signal_getDescriptor(Signal self)
 {
-	unidesc ret;
-	ret.i32 = (self != NULL)? self->fd : -1;
-	return ret;
+	if (self) {
+		unidesc ret;
+		ret.i32 = self->fd;
+		return ret;
+	}
+	return Hal_getInvalidUnidesc();
 }
 
 #endif // __linux__

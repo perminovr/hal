@@ -1,49 +1,17 @@
 
-#ifdef __linux__
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
+#if defined(_WIN32) || defined(_WIN64)
 
 #include "hal_socket_stream.h"
 #include "hal_thread.h"
-#include <arpa/inet.h>
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <ifaddrs.h>
-#include <linux/if_packet.h>
-#include <linux/uinput.h>
-#include <linux/version.h>
-#include <netdb.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/eventfd.h>
-#include <sys/ioctl.h>
-#include <sys/io.h>
-#include <sys/mman.h>
-#include <sys/poll.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/un.h>
-#include <time.h>
-#include <unistd.h>
-
-// our kernel supports it
-#define TCP_USER_TIMEOUT	18
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#include <netioapi.h>
+#include <windows.h>
 
 
 struct sClientSocket {
-	int fd;
+	SOCKET s;
 	int domain;
 	//
 	ServerSocket server;
@@ -59,7 +27,7 @@ struct sClients {
 };
 
 struct sServerSocket {
-	int fd;
+	SOCKET s;
 	int domain;
 	struct sClients clients;
 };
@@ -68,10 +36,10 @@ struct sServerSocket {
 static bool prepareSocketAddress(const char *address, uint16_t port, struct sockaddr_in *sockaddr);
 
 
-static inline void setSocketNonBlocking(int fd)
+static inline void setSocketNonBlocking(SOCKET s)
 {
-	int flags = fcntl(fd, F_GETFL, 0);
-	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	u_long val = 1;
+	ioctlsocket(s, FIONBIO, &val);
 }
 
 
@@ -79,15 +47,15 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 {
 	if (address == NULL || port == 0) return NULL;
 
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) return NULL;
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock == INVALID_SOCKET) return NULL;
 
 	struct sockaddr_in serverAddress;
 
 	if (!prepareSocketAddress(address, port, &serverAddress)) {
 		goto exit_error;
 	}
-	if (bind(fd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
+	if (bind(sock, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) != 0) {
 		goto exit_error;
 	}
 
@@ -100,33 +68,33 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 	if (self) {
 		self->clients.self = (struct sClientSocket *)calloc(maxConnections, sizeof(struct sClientSocket));
 		if (self->clients.self) {
-			self->fd = fd;
+			self->s = sock;
 			self->domain = AF_INET;
 			self->clients.maxConnections = maxConnections;
 			self->clients.mu = mu;
-			setSocketNonBlocking(fd);
+			setSocketNonBlocking(sock);
 			return self;
 		} else { free(self); }
 	}
 
 exit_error:
 	if (mu) Mutex_destroy(mu);
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
 
 ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 {
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd < 0) return NULL;
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock == INVALID_SOCKET) return NULL;
 
 	if (ip || port) {
 		struct sockaddr_in addr;
 		if (!prepareSocketAddress(ip, port, &addr)) {
 			goto exit_error;
 		}
-		if (bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) < 0) {
+		if (bind(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) != 0) {
 			goto exit_error;
 		}
 	}
@@ -136,20 +104,20 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 		.l_onoff = 1,
 		.l_linger = 0
 	};
-	if (setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) < 0) goto exit_error;
+	if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) != 0) goto exit_error;
 
 	ClientSocket self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
-		self->fd = fd;
+		self->s = sock;
 		self->domain = AF_INET;
 		self->server = NULL;
 		self->idx = -1;
-		setSocketNonBlocking(fd);
+		setSocketNonBlocking(sock);
 		return self;
 	}
 
 exit_error:
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
@@ -164,13 +132,13 @@ void TcpClientSocket_activateTcpKeepAlive(ClientSocket self, int idleTime, int i
 	int optval;
 	socklen_t optlen = sizeof(optval);
 	optval = 1;
-	setsockopt(self->fd, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen);
+	setsockopt(self->s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen);
 	optval = idleTime;
-	setsockopt(self->fd, IPPROTO_TCP, TCP_KEEPIDLE, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPIDLE, &optval, optlen);
 	optval = interval;
-	setsockopt(self->fd, IPPROTO_TCP, TCP_KEEPINTVL, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPINTVL, &optval, optlen);
 	optval = count;
-	setsockopt(self->fd, IPPROTO_TCP, TCP_KEEPCNT, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPCNT, &optval, optlen);
 }
 
 void TcpClientSocket_activateTcpNoDelay(ClientSocket self)
@@ -178,13 +146,12 @@ void TcpClientSocket_activateTcpNoDelay(ClientSocket self)
 	if (self == NULL) return;
 	int optval = 1;
 	socklen_t optlen = sizeof(optval);
-	setsockopt(self->fd, IPPROTO_TCP, TCP_NODELAY, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_NODELAY, &optval, optlen);
 }
 
 void TcpClientSocket_setUnacknowledgedTimeout(ClientSocket self, int timeoutInMs)
 {
 	if (self == NULL) return;
-	setsockopt(self->fd, SOL_TCP, TCP_USER_TIMEOUT, &timeoutInMs, sizeof(timeoutInMs));
 }
 
 
@@ -192,61 +159,36 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 {
 	if (address == NULL) return NULL;
 
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (fd < 0) return NULL;
-
 	unlink(address);
 
-	struct sockaddr_un addr;
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, address);
+	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+	ServerSocket self = TcpServerSocket_create(maxConnections, HAL_LOCAL_SOCK_ADDR, port);
 
-	if (bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) < 0) {
-		goto exit_error;
-	}
-
-	Mutex mu = Mutex_create();
-	if (!mu) {
-		goto exit_error;
-	}
-
-	ServerSocket self = (ServerSocket)calloc(1, sizeof(struct sServerSocket));
 	if (self) {
-		self->clients.self = (struct sClientSocket *)calloc(maxConnections, sizeof(struct sClientSocket));
-		if (self->clients.self) {
-			self->fd = fd;
-			self->domain = AF_UNIX;
-			self->clients.maxConnections = maxConnections;
-			self->clients.mu = mu;
-			setSocketNonBlocking(fd);
-			return self;
-		} else { free(self); }
+		self->domain = AF_UNIX;
 	}
 
-exit_error:
-	if (mu) Mutex_destroy(mu);
-	close(fd);
-	return NULL;
+	return self;
 }
 
 
 ClientSocket LocalClientSocket_create(void)
 {
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (fd < 0) return NULL;
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock == INVALID_SOCKET) return NULL;
 
 	ClientSocket self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
-		self->fd = fd;
+		self->s = sock;
 		self->domain = AF_UNIX;
 		self->server = NULL;
 		self->idx = -1;
-		setSocketNonBlocking(fd);
+		setSocketNonBlocking(sock);
 		return self;
 	}
-	
+
 // exit_error:
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
@@ -254,22 +196,22 @@ ClientSocket LocalClientSocket_create(void)
 void ServerSocket_listen(ServerSocket self, int pending)
 {
 	if (self == NULL) return;
-	listen(self->fd, pending);
+	listen(self->s, pending);
 }
 
 ClientSocket ServerSocket_accept(ServerSocket self)
 {
 	if (self == NULL) return NULL;
 
-	int fd;
+	SOCKET sock;
 
 	ClientSocket conSocket = NULL;
-	fd = accept(self->fd, NULL, NULL);
+	sock = accept(self->s, NULL, NULL);
 
-	if (fd >= 0) {
+	if (sock != INVALID_SOCKET) {
 		struct sockaddr_storage addr;
 		socklen_t addrLen = sizeof(addr);
-		if (getsockname(fd, (struct sockaddr*)&addr, &addrLen) != 0) goto exit_error;
+		if (getsockname(sock, (struct sockaddr*)&addr, &addrLen) != 0) goto exit_error;
 		Mutex_lock(self->clients.mu);
 		{
 			if (self->clients.size >= self->clients.maxConnections) {
@@ -279,7 +221,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 			for (int i = 0; i < self->clients.maxConnections; ++i) {
 				if ( self->clients.self[i].server == NULL ) {
 					conSocket = &(self->clients.self[i]);
-					conSocket->fd = fd;
+					conSocket->s = sock;
 					conSocket->domain = addr.ss_family;
 					conSocket->server = self;
 					conSocket->idx = i;
@@ -294,7 +236,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 	return conSocket;
 
 exit_error:
-	close(fd);
+	closesocket(sock);
 	return NULL;
 }
 
@@ -343,11 +285,11 @@ static void ServerSocket_deleteClient(ServerSocket self, ClientSocket client)
 	}
 }
 
-static inline void closeAndShutdownSocket(int fd)
+static inline void closeAndShutdownSocket(SOCKET sock)
 {
-	if (fd != -1) {
-		shutdown(fd, SHUT_RDWR);
-		close(fd);
+	if (sock != INVALID_SOCKET) {
+		shutdown(sock, SD_BOTH);
+		closesocket(sock);
 	}
 }
 
@@ -357,8 +299,8 @@ bool ServerSocket_destroy(ServerSocket self)
 	if (self->clients.size != 0) return false;
 	Mutex_destroy(self->clients.mu);
 	free(self->clients.self);
-	closeAndShutdownSocket(self->fd);
-	self->fd = -1;
+	closeAndShutdownSocket(self->s);
+	self->s = INVALID_SOCKET;
 	free(self);
 	return true;
 }
@@ -367,7 +309,7 @@ unidesc ServerSocket_getDescriptor(ServerSocket self)
 {
 	if (self) {
 		unidesc ret;
-		ret.i32 = self->fd;
+		ret.u64 = (uint64_t)self->s;
 		return ret;
 	}
 	return Hal_getInvalidUnidesc();
@@ -379,22 +321,23 @@ bool ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress addr
 	if (self == NULL || address == NULL) return false;
 	if (self->server) return false;
 
+	struct sockaddr_in serverAddress;
+
 	switch (self->domain) {
 		case AF_INET: {
-			struct sockaddr_in serverAddress;
 			if (!prepareSocketAddress(address->ip, address->port, &serverAddress))
 				return false;
-			if (connect(self->fd, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
+			if (connect(self->s, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
 				if (errno != EINPROGRESS) {
 					return false;
 				}
 			}
 		} break;
 		case AF_UNIX: {
-			struct sockaddr_un addr;
-			addr.sun_family = AF_UNIX;
-			strcpy(addr.sun_path, address->address);
-			if (connect(self->fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
+			uint16_t port = Hal_generatePort(address->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+			if (!prepareSocketAddress(HAL_LOCAL_SOCK_ADDR, port, &serverAddress))
+				return false;
+			if (connect(self->s, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
 				return false;
 			}
 		} break;
@@ -417,12 +360,12 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 
 	fd_set fdSet;
 	FD_ZERO(&fdSet);
-	FD_SET(self->fd, &fdSet);
+	FD_SET(self->s, &fdSet);
 
-	if (select(self->fd + 1, NULL, &fdSet , NULL, &timeout) == 1) {
+	if (select(0, NULL, &fdSet , NULL, &timeout) == 1) {
 		int so_error;
 		socklen_t len = sizeof so_error;
-		if (getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &len) >= 0) {
+		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) {
 			if (so_error == 0) {
 				return true;
 			}
@@ -435,10 +378,10 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 bool ClientSocket_reset(ClientSocket self)
 {
 	if (self == NULL) return false;
-	if (self->fd >= 0 && self->server == NULL) {
-		closeAndShutdownSocket(self->fd);
-		self->fd = socket(self->domain, SOCK_STREAM, 0);
-		if (self->fd >= 0) {
+	if (self->s != INVALID_SOCKET && self->server == NULL) {
+		closeAndShutdownSocket(self->s);
+		self->s = socket(AF_INET, SOCK_STREAM, 0);
+		if (self->s != INVALID_SOCKET) {
 			return true;
 		}
 	}
@@ -454,15 +397,15 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 	bzero(&timeout, sizeof(struct timeval));
 
 	FD_ZERO(&fdSet);
-	FD_SET(self->fd, &fdSet);
+	FD_SET(self->s, &fdSet);
 
-	int selectVal = select(self->fd+1, NULL, &fdSet , NULL, &timeout);
+	int selectVal = select(0, NULL, &fdSet , NULL, &timeout);
 
 	if (selectVal == 1) {
 		/* Check if connection is established */
 		int so_error;
 		socklen_t len = sizeof(so_error);
-		if (getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &len) >= 0) {
+		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) {
 			if (so_error == 0)
 				return SOCKET_STATE_CONNECTED;
 		}
@@ -478,18 +421,18 @@ int ClientSocket_read(ClientSocket self, uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
 
-	if (self->fd == -1)
+	if (self->s == INVALID_SOCKET)
 		return -1;
 
-	int read_bytes = recv(self->fd, buf, size, MSG_DONTWAIT); // todo
+	int read_bytes = recv(self->s, (char *)buf, size, 0); // todo
 
 	if (read_bytes == 0)
 		return 0;
 
 	if (read_bytes < 0) {
-		int error = errno;
+		int error = WSAGetLastError();
 		switch (error) {
-			case EAGAIN: return 0;
+			case WSAEWOULDBLOCK: return 0;
 			default: return -1;
 		}
 	}
@@ -501,14 +444,14 @@ int ClientSocket_write(ClientSocket self, const uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
 
-	if (self->fd == -1)
+	if (self->s == INVALID_SOCKET)
 		return -1;
 
-	/* MSG_NOSIGNAL - prevent send to signal SIGPIPE when peer unexpectedly closed the socket */
-	int retVal = send(self->fd, buf, size, MSG_NOSIGNAL); // todo
+	int retVal = send(self->s, (const char *)buf, size, 0); // todo
 
 	if (retVal <= 0) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+		int error = WSAGetLastError();
+		if (error == EWOULDBLOCK) {
 			return 0;
 		} else {
 			return -1;
@@ -526,10 +469,6 @@ static bool convertAddressToStr(struct sockaddr_storage *addr, ClientSocketAddre
 			address->port = ntohs(paddr->sin_port);
 			inet_ntop(AF_INET, &(paddr->sin_addr), address->ip, INET_ADDRSTRLEN);
 		} break;
-		case AF_UNIX: {
-			struct sockaddr_un *paddr = (struct sockaddr_un*)addr;
-			strncpy(address->address, paddr->sun_path, sizeof(address->address)-1);
-		} break;
 		default: return false;
 	}
 	return true;
@@ -540,7 +479,7 @@ bool ClientSocket_getPeerAddress(ClientSocket self, ClientSocketAddress address)
 	if (self == NULL || address == NULL) return false;
 	struct sockaddr_storage addr;
 	socklen_t addrLen = sizeof(addr);
-	if (getpeername(self->fd, (struct sockaddr*) &addr, &addrLen) == 0) {
+	if (getpeername(self->s, (struct sockaddr*) &addr, &addrLen) == 0) {
 		return convertAddressToStr(&addr, address);
 	}
 	return false;
@@ -551,7 +490,7 @@ bool ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address
 	if (self == NULL || address == NULL) return false;
 	struct sockaddr_storage addr;
 	socklen_t addrLen = sizeof(addr);
-	if (getsockname(self->fd, (struct sockaddr*) &addr, &addrLen) == 0) {
+	if (getsockname(self->s, (struct sockaddr*) &addr, &addrLen) == 0) {
 		return convertAddressToStr(&addr, address);
 	}
 	return false;
@@ -560,8 +499,8 @@ bool ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address
 void ClientSocket_destroy(ClientSocket self)
 {
 	if (self == NULL) return;
-	closeAndShutdownSocket(self->fd);
-	self->fd = -1;
+	closeAndShutdownSocket(self->s);
+	self->s = INVALID_SOCKET;
 	if (self->server) {
 		ServerSocket_deleteClient(self->server, self);
 	} else {
@@ -573,7 +512,7 @@ unidesc ClientSocket_getDescriptor(ClientSocket self)
 {
 	if (self) {
 		unidesc ret;
-		ret.i32 = self->fd;
+		ret.u64 = (uint64_t)self->s;
 		return ret;
 	}
 	return Hal_getInvalidUnidesc();
@@ -611,4 +550,5 @@ static bool prepareSocketAddress(const char *address, uint16_t port, struct sock
 	return retVal;
 }
 
-#endif // __linux__
+
+#endif // _WIN32 || _WIN64

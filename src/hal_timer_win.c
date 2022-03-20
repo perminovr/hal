@@ -4,12 +4,49 @@
 #include <time.h>
 #include <windows.h>
 #include "hal_timer.h"
+#include "hal_thread.h"
 
 
 struct sTimer {
-	int fd;
-	AccurateTime_t lastTimeout;
+	Signal sig;
+	UINT uTimerID;
+	bool periodical;
+	UINT lastTimeout;
 };
+
+
+static void Timer_callback(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2)
+{
+	(void)uMsg;
+	(void)dw1;
+	(void)dw2;
+	Timer self = (Timer)dwUser;
+	if (!self->periodical) {
+		timeKillEvent(uTimerID);
+		self->uTimerID = 0;
+	}
+	Signal_raise(self->sig);
+}
+
+static bool Timer_set(Timer self, UINT delay, bool periodically)
+{
+	if (self->uTimerID) timeKillEvent(self->uTimerID);
+	self->uTimerID = timeSetEvent(delay, 0, 
+			Timer_callback, (DWORD_PTR)self, 
+			((periodically)? TIME_PERIODIC : TIME_ONESHOT));
+	if (self->uTimerID) {
+		self->periodical = periodically;
+		return true;
+	}
+	return false;
+}
+
+static inline UINT Timer_getDelay(AccurateTime_t *timeout)
+{
+	// UINT ms = timeout->nsec/1000000;
+	// if ((timeout->nsec - ms*1000000) >= 5*100000) ms++;
+	return timeout->sec * 1000 + timeout->nsec/1000000;
+}
 
 
 bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
@@ -17,35 +54,16 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	if (self == NULL) return false;
 	if (timeout == NULL) return false;
 
-	Timer_endEvent(self);
-
-	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
-
-	its.it_value.tv_sec = timeout->sec;
-	its.it_value.tv_nsec = timeout->nsec;
-
-	self->lastTimeout.sec = timeout->sec;
-	self->lastTimeout.nsec = timeout->nsec;
-
-	timerfd_settime(self->fd, 0, &its, NULL);
-
-	return true;
+	UINT delay = Timer_getDelay(timeout);
+	bool ret = Timer_set(self, delay, false);
+	if (ret) { self->lastTimeout = delay; }
+	return ret;
 }
 
 bool Timer_repeatTimeout(Timer self)
 {
 	if (self == NULL) return false;
-
-	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
-
-	its.it_value.tv_sec = self->lastTimeout.sec;
-	its.it_value.tv_nsec = self->lastTimeout.nsec;
-
-	timerfd_settime(self->fd, 0, &its, NULL);
-
-	return true;
+	return Timer_set(self, self->lastTimeout, false);
 }
 
 bool Timer_setPeriod(Timer self, AccurateTime_t *period)
@@ -53,25 +71,15 @@ bool Timer_setPeriod(Timer self, AccurateTime_t *period)
 	if (self == NULL) return false;
 	if (period == NULL) return false;
 
-	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
-
-	its.it_value.tv_sec = period->sec;
-	its.it_value.tv_nsec = period->nsec;
-	its.it_interval.tv_sec = period->sec;
-	its.it_interval.tv_nsec = period->nsec;
-
-	timerfd_settime(self->fd, 0, &its, NULL);
-
-	return true;
+	UINT delay = Timer_getDelay(period);
+	return Timer_set(self, delay, true);
 }
 
 bool Timer_stop(Timer self)
 {
 	if (self == NULL) return false;
-	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
-	timerfd_settime(self->fd, 0, &its, NULL);
+	if (self->uTimerID) timeKillEvent(self->uTimerID);
+	self->uTimerID = 0;
 	Timer_endEvent(self);
 	return true;
 }
@@ -79,61 +87,46 @@ bool Timer_stop(Timer self)
 void Timer_endEvent(Timer self)
 {
 	if (self == NULL) return;
-	uint64_t buf;
-	(void)read(self->fd, &buf, sizeof(uint64_t));
+	Signal_end(self->sig);
 }
 
 Timer Timer_create(void)
 {
+	Signal sig = Signal_create();
+	if (!sig) return NULL;
 	Timer self = (Timer)calloc(1, sizeof(struct sTimer));
 	if (self) {
-		self->fd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK);
-		if (self->fd < 0) {
-			free(self);
-			return NULL;
-		}
+		self->sig = sig;
 	}
 	return self;
 }
 
 void Timer_destroy(Timer self)
 {
-	if (self != NULL) {
-		close(self->fd);
-		free(self);
-	}
+	if (self == NULL) return;
+	if (self->uTimerID) timeKillEvent(self->uTimerID);
+	Signal_destroy(self->sig);
+	free(self);
 }
 
 unidesc Timer_getDescriptor(Timer self)
 {
-	unidesc ret;
-	ret.i32 = (self != NULL)? self->fd : -1;
-	return ret;
+	if (self) {
+		return Signal_getDescriptor(self->sig);
+	}
+	return Hal_getInvalidUnidesc();
 }
 
 
+// todo 
+
 unidesc Timer_setSingleShot(AccurateTime_t *time)
 {
-	unidesc ud;
-	ud.vptr = CreateTimerQueue();
-	if (ud.i32 < 0) {
-		return ud;
-	}
-
-	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
-
-	its.it_value.tv_sec = time->sec;
-	its.it_value.tv_nsec = time->nsec;
-
-	timerfd_settime(ud.i32, 0, &its, NULL);
-
-	return ud;
+	return Hal_getInvalidUnidesc();
 }
 
 void Timer_endSingleShot(unidesc desc)
 {
-	close(desc.i32);
 }
 
 #endif // _WIN32 || _WIN64

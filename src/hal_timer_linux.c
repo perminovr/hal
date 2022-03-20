@@ -18,7 +18,7 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	if (self == NULL) return false;
 	if (timeout == NULL) return false;
 
-	Timer_endEvent(self);
+	// Timer_endEvent(self); // todo
 
 	struct itimerspec its;
 	bzero(&its, sizeof(struct itimerspec));
@@ -107,9 +107,12 @@ void Timer_destroy(Timer self)
 
 unidesc Timer_getDescriptor(Timer self)
 {
-	unidesc ret;
-	ret.i32 = (self != NULL)? self->fd : -1;
-	return ret;
+	if (self) {
+		unidesc ret;
+		ret.i32 = self->fd;
+		return ret;
+	}
+	return Hal_getInvalidUnidesc();
 }
 
 

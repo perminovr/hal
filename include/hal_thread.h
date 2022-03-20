@@ -159,17 +159,10 @@ HAL_API void
 Mutex_destroy(Mutex self);
 
 
-HAL_API SmartMutex
-SmartMutex_create(void);
-
-HAL_API void
-SmartMutex_lock(SmartMutex self);
-
-HAL_API void
-SmartMutex_unlock(SmartMutex self);
-
-HAL_API void
-SmartMutex_destroy(SmartMutex self);
+#define SmartMutex Mutex
+#define SmartMutex_create Mutex_create
+#define SmartMutex_lock Mutex_lock
+#define SmartMutex_unlock Mutex_unlock
 
 
 HAL_API Signal
@@ -188,7 +181,9 @@ HAL_API void
 Signal_destroy(Signal self);
 
 HAL_API unidesc
-Signal_getNativeDescriptor(Signal self);
+Signal_getDescriptor(Signal self);
+
+#define Signal_getNativeDescriptor Signal_getDescriptor // todo
 
 
 /*! @} */

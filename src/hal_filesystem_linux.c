@@ -81,7 +81,7 @@ DirectoryHandle FileSystem_openDirectory(const char *directoryName)
 	return (DirectoryHandle)opendir(directoryName);
 }
 
-char *FileSystem_readDirectory(DirectoryHandle directory, bool *isDirectory)
+const char *FileSystem_readDirectory(DirectoryHandle directory, bool *isDirectory)
 {
 	if (directory == NULL) return NULL;
 	struct dirent *dir;
