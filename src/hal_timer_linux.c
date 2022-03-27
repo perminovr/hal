@@ -18,7 +18,7 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	if (self == NULL) return false;
 	if (timeout == NULL) return false;
 
-	// Timer_endEvent(self); // todo
+	Timer_endEvent(self);
 
 	struct itimerspec its;
 	bzero(&its, sizeof(struct itimerspec));
@@ -53,6 +53,8 @@ bool Timer_setPeriod(Timer self, AccurateTime_t *period)
 {
 	if (self == NULL) return false;
 	if (period == NULL) return false;
+
+	Timer_endEvent(self);
 
 	struct itimerspec its;
 	bzero(&its, sizeof(struct itimerspec));

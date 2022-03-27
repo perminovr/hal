@@ -28,7 +28,7 @@ typedef void *DirectoryHandle;
  * \brief open a file
  *
  * \param pathName full name (path + filename) of the file
- * \param readWrite true opens the file with read and write access - false opens for read access only
+ * \param readWrite true opens the file with read and write+ access - false opens for read access only
  *
  * \return a handle for the file. Has to be used by subsequent calls to file functions to identify the file or
  *		 NULL if opening fails
@@ -161,7 +161,7 @@ HAL_API void
 FileSystem_closeDirectory(DirectoryHandle directory);
 
 /**
- * \brief create the directoy with the specified name
+ * \brief create the directory with the specified name
  *
  * \param directoryName
  *
@@ -170,6 +170,26 @@ FileSystem_closeDirectory(DirectoryHandle directory);
 HAL_API bool
 FileSystem_createDirectory(const char *directoryName);
 
+/**
+ * \brief remove the directory and its content with the specified name
+ *
+ * \param directoryName
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool 
+FileSystem_deleteDirectory(const char *directoryName);
+
+/**
+ * \brief move the directory and its content
+ *
+ * \param dirName
+ * \param newDirName
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool 
+FileSystem_moveDirectory(const char *dirName, const char *newDirName);
 
 /*! @} */
 

@@ -10,10 +10,10 @@ static inline int poll( struct pollfd *pfd, unsigned long int nfds, int timeout)
 	return WSAPoll ( (LPWSAPOLLFD)pfd, (ULONG)nfds, (INT)timeout ); 
 }
 
-static inline int events_win_to_hal(SHORT pollev)
+static inline int events_win_to_hal0(SHORT pollev)
 {
 	switch (pollev) {
-		case POLLIN: return HAL_POLLIN;
+		case POLLRDNORM: case POLLRDBAND: case POLLIN: return HAL_POLLIN;
 		case POLLOUT: return HAL_POLLOUT;
 		case POLLPRI: return HAL_POLLPRI;
 		case POLLERR: return HAL_POLLERR;
@@ -22,8 +22,20 @@ static inline int events_win_to_hal(SHORT pollev)
 		default: return 0;
 	}
 }
+static int events_win_to_hal(SHORT pollev)
+{
+	const SHORT pollarr[] = { 
+		POLLIN, POLLOUT, POLLPRI, 
+		POLLERR, POLLHUP, POLLNVAL 
+	};
+	int ret = 0;
+	for (int i = 0; i < 6; ++i) {
+		ret |= events_win_to_hal0( pollev & pollarr[i] );
+	}
+	return ret;
+}
 
-static inline SHORT events_hal_to_win(int pollev)
+static inline SHORT events_hal_to_win0(int pollev)
 {
 	switch (pollev) {
 		case HAL_POLLIN: return POLLIN;
@@ -34,6 +46,18 @@ static inline SHORT events_hal_to_win(int pollev)
 		case HAL_POLLNVAL: return POLLNVAL;
 		default: return 0;
 	}
+}
+static SHORT events_hal_to_win(int pollev)
+{
+	const int pollarr[] = { 
+		HAL_POLLIN, HAL_POLLOUT, HAL_POLLPRI, 
+		HAL_POLLERR, HAL_POLLHUP, HAL_POLLNVAL 
+	};
+	SHORT ret = 0;
+	for (int i = 0; i < 6; ++i) {
+		ret |= events_hal_to_win0( pollev & pollarr[i] );
+	}
+	return ret;
 }
 
 
@@ -50,6 +74,7 @@ int Hal_poll(Pollfd pfd, unsigned long int size, int timeout)
 	for (i = 0; i < size; ++i) {
 		lpfd[i].fd = pfd[i].fd.u64;
 		lpfd[i].events = events_hal_to_win(pfd[i].events);
+		lpfd[i].revents = 0;
 	}
 
 	ret = poll(lpfd, size, timeout);
@@ -61,6 +86,22 @@ int Hal_poll(Pollfd pfd, unsigned long int size, int timeout)
 	return ret;
 }
 
+
+int Hal_pollSingle(unidesc fd, int events, int *revents, int timeout)
+{
+	if (Hal_unidescIsInvalid(fd)) return -1;
+
+	int ret = 0;
+	struct pollfd lpfd;
+	lpfd.fd = fd.u64;
+	lpfd.events = events_hal_to_win(events);
+	lpfd.revents = 0;
+
+	ret = poll(&lpfd, 1, timeout);
+	if (revents) *revents = events_win_to_hal(lpfd.revents);
+
+	return ret;
+}
 
 
 typedef struct {
@@ -112,11 +153,11 @@ static inline int getFdIndex(HalPoll self, unidesc fd)
 }
 
 
-static inline void setSysPollfd(HalPoll self, int idx, uint64_t fd, int events, int revents)
+static inline void setSysPollfd(HalPoll self, int idx, uint64_t fd, int events, int revents, bool iswin)
 {
 	self->pfd[idx].fd = (SOCKET)fd;
-	self->pfd[idx].events = events_hal_to_win(events);
-	self->pfd[idx].revents = events_hal_to_win(revents);
+	self->pfd[idx].events = (iswin)? events : events_hal_to_win(events);
+	self->pfd[idx].revents = (iswin)? revents : events_hal_to_win(revents);
 }
 
 
@@ -126,13 +167,13 @@ bool HalPoll_update(HalPoll self, unidesc fd, int events, void *object, void *us
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 		self->objects[i].object = object;
 		self->objects[i].user = user;
 		self->objects[i].handler = handler;
 		self->size++;
 	} else { // update old
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 		self->objects[i].object = object;
 		self->objects[i].user = user;
 		self->objects[i].handler = handler;
@@ -148,10 +189,10 @@ bool HalPoll_update_1(HalPoll self, unidesc fd, int events)
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 		self->size++;
 	} else { // update old
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 	}
 	self->updated = true;
 	return true;
@@ -164,7 +205,7 @@ bool HalPoll_update_2(HalPoll self, unidesc fd, void *object)
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, 0, 0);
+		setSysPollfd(self, i, fd.u64, 0, 0, false);
 		self->objects[i].object = object;
 		self->size++;
 	} else { // update old
@@ -181,7 +222,7 @@ bool HalPoll_update_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandler
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, 0, 0);
+		setSysPollfd(self, i, fd.u64, 0, 0, false);
 		self->objects[i].user = user;
 		self->objects[i].handler = handler;
 		self->size++;
@@ -197,10 +238,11 @@ bool HalPoll_update_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandler
 bool HalPoll_update_4(HalPoll self, unidesc old_fd, unidesc new_fd)
 {
 	if (self == NULL) return false;
+	if (Hal_unidescIsInvalid(new_fd)) return false;
 	if (Hal_unidescIsEqual(&old_fd, &new_fd)) return true;
 	int i = getFdIndex(self, old_fd);
 	if (i == self->size) return false;
-	setSysPollfd(self, i, new_fd.u64, self->pfd[i].events, 0);
+	setSysPollfd(self, i, new_fd.u64, self->pfd[i].events, 0, true);
 	self->updated = true;
 	return true;
 }
@@ -213,13 +255,13 @@ bool HalPoll_update_cpp(HalPoll self, unidesc fd, int events, void *object, void
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 		self->objects[i].object = object;
 		self->objects[i].user = user;
 		self->objects[i].cpphandler = handler;
 		self->size++;
 	} else { // update old
-		setSysPollfd(self, i, fd.u64, events, 0);
+		setSysPollfd(self, i, fd.u64, events, 0, false);
 		self->objects[i].object = object;
 		self->objects[i].user = user;
 		self->objects[i].cpphandler = handler;
@@ -234,7 +276,7 @@ bool HalPoll_update_cpp_3(HalPoll self, unidesc fd, void *user, PollfdReventsHan
 	int i = getFdIndex(self, fd);
 	if (i == self->size) { // add new
 		if (self->size >= self->maxSize) return false;
-		setSysPollfd(self, i, fd.u64, 0, 0);
+		setSysPollfd(self, i, fd.u64, 0, 0, false);
 		self->objects[i].user = user;
 		self->objects[i].cpphandler = handler;
 		self->size++;
@@ -257,14 +299,14 @@ bool HalPoll_remove(HalPoll self, unidesc fd)
 		return false;
 	} else {
 		for (; i < self->size-1; ++i) {
-			setSysPollfd(self, i, self->pfd[i+1].fd, self->pfd[i+1].events, self->pfd[i+1].revents);
+			setSysPollfd(self, i, self->pfd[i+1].fd, self->pfd[i+1].events, self->pfd[i+1].revents, true);
 			self->objects[i].object = self->objects[i+1].object;
 			self->objects[i].user = self->objects[i+1].user;
 			self->objects[i].handler = self->objects[i+1].handler;
 			HALDEFCPP(self->objects[i].cpphandler = self->objects[i+1].cpphandler;)
 		}
 		i = self->size-1;
-		setSysPollfd(self, i, -1, 0, 0);
+		setSysPollfd(self, i, Hal_getInvalidUnidesc().u64, 0, 0, false);
 		self->objects[i].object = NULL;
 		self->objects[i].user = NULL;
 		self->objects[i].handler = NULL;

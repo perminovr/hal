@@ -18,6 +18,7 @@ struct sThread {
 	int state;
 	bool autodestroy;
 	Signal killSignal;
+	Signal cs;
 };
 
 
@@ -74,8 +75,13 @@ int Mutex_timedlock(Mutex self, int millies)
 {
 	if (self == NULL) return -1;
 	struct timespec t;
-	t.tv_sec = millies/1000;
-	t.tv_nsec = (millies%1000)*1000*1000;
+	clock_gettime(CLOCK_REALTIME, &t);
+	t.tv_sec += millies/1000;
+	t.tv_nsec += (millies%1000)*1000*1000;
+	if (t.tv_nsec > 1000000000) {
+		t.tv_sec++;
+		t.tv_nsec -= 1000000000;
+	}
 	return pthread_mutex_timedlock((pthread_mutex_t*)self, &t);
 }
 
@@ -95,24 +101,27 @@ void Mutex_destroy(Mutex self)
 
 Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
 {
-	Thread thread = (Thread) calloc(1, sizeof(struct sThread));
+	Thread self = (Thread) calloc(1, sizeof(struct sThread));
 
-	if (thread != NULL) {
-		thread->stackSize = stackSize;
-		thread->parameter = parameter;
-		thread->function = function;
-		thread->state = 0;
-		thread->autodestroy = autodestroy;
+	if (self != NULL) {
+		self->cs = Signal_create();
+		if (self->cs) {
+			self->stackSize = stackSize;
+			self->parameter = parameter;
+			self->function = function;
+			self->state = 0;
+			self->autodestroy = autodestroy;
+		}
 	}
 
-	return thread;
+	return self;
 }
 
 static void *destroyAutomaticThread(void *parameter)
 {
-	Thread thread = (Thread)parameter;
-	thread->function(thread->parameter);
-	free(thread);
+	Thread self = (Thread)parameter;
+	self->function(self->parameter);
+	free(self);
 	pthread_exit(NULL);
 }
 
@@ -142,6 +151,7 @@ void Thread_destroy(Thread self)
 	if (self->state == 1) {
 		pthread_join(self->pthread, NULL);
 	}
+	Signal_destroy(self->cs);
 	free(self);
 }
 
@@ -161,7 +171,7 @@ void Thread_cancel(Thread self)
 	if (self->killSignal)
 		Signal_raise(self->killSignal);
 	if (!self->autodestroy)
-		pthread_cancel(self->pthread);
+		Signal_raise(self->cs);
 }
 
 void Thread_testCancel(Thread self)
@@ -169,14 +179,18 @@ void Thread_testCancel(Thread self)
 	if (self == NULL) return;
 	if (self->killSignal)
 		Signal_end(self->killSignal);
-	if (!self->autodestroy)
-		pthread_testcancel();
+	if (!self->autodestroy) {
+		if (Signal_event(self->cs)) {
+			Signal_end(self->cs);
+			pthread_exit(NULL);
+		}
+	}
 }
 
-unidesc Thread_getNativeDescriptor(Thread thread)
+unidesc Thread_getNativeDescriptor(Thread self)
 {
 	unidesc ret;
-	ret.u64 = (thread != NULL)? thread->pthread : 0;
+	ret.u64 = (self != NULL)? self->pthread : 0;
 	return ret;
 }
 

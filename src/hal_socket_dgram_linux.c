@@ -289,9 +289,9 @@ bool DgramSocket_reset(DgramSocket self)
 	return false;
 }
 
-bool DgramSocket_close(DgramSocket self) // hal internal use only
+void DgramSocket_close(DgramSocket self) // hal internal use only
 {
-	if (self == NULL) return false;
+	if (self == NULL) return;
 	if (self->fd >= 0) {
 		close(self->fd);
 		self->fd = -1;
@@ -315,6 +315,7 @@ int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf
 	if (self == NULL || addr == NULL || buf == NULL) return -1;
 	struct sockaddr_storage saddr;
 	socklen_t addr_size;
+	memset(&saddr, 0, sizeof(struct sockaddr_storage));
 	switch (self->domain) {
 		case AF_INET: {
 			addr_size = sizeof(struct sockaddr_in);
@@ -354,6 +355,7 @@ int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const u
 	if (self == NULL || addr == NULL || buf == NULL) return -1;
 	struct sockaddr_storage saddr;
 	socklen_t addr_size = 0;
+	memset(&saddr, 0, sizeof(struct sockaddr_storage));
 	switch (self->domain) {
 		case AF_INET: {
 			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;

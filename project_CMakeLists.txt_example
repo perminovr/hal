@@ -1,0 +1,19 @@
+cmake_minimum_required(VERSION 3.10)
+project(project0)
+
+# for ethernet supporting
+set(HAL_PCAP_SUPPORTED ON)
+set(NPCAPLIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/npcap)
+
+# enable hal tests
+enable_testing()
+set(HAL_TESTS ON)
+
+# add libhal for building
+add_subdirectory(libhal)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libhal/include)
+
+# add project target and link libhal
+FILE(GLOB project0_src src/*.c)
+add_executable(project0 ${project0_src})
+target_link_libraries(project0 PUBLIC libhal)

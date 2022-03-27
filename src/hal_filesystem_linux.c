@@ -16,7 +16,7 @@
 FileHandle FileSystem_openFile(const char *fileName, bool readWrite)
 {
 	if (fileName == NULL) return NULL;
-	return (FileHandle) ((readWrite)? fopen(fileName, "w") : fopen(fileName, "r"));
+	return (FileHandle) ((readWrite)? fopen(fileName, "ab") : fopen(fileName, "rb"));
 }
 
 int FileSystem_readFile(FileHandle handle, uint8_t *buffer, int maxSize)
@@ -35,7 +35,7 @@ int FileSystem_readFileOffs(FileHandle handle, long offset, uint8_t *buffer, int
 int FileSystem_writeFile(FileHandle handle, uint8_t *buffer, int size)
 {
 	if (handle == NULL || buffer == NULL) return -1;
-	return fwrite(buffer, size, 1, (FILE*) handle);
+	return fwrite(buffer, 1, size, (FILE*) handle);
 }
 
 void FileSystem_closeFile(FileHandle handle)
@@ -139,6 +139,41 @@ bool FileSystem_createDirectory(const char *directoryName)
 	}
 	ok = do_mkdir(directoryName, mode);
 	return ok;
+}
+
+bool FileSystem_deleteDirectory(const char *directoryName)
+{
+	DirectoryHandle dh = FileSystem_openDirectory(directoryName);
+	if (dh == NULL) return false;
+
+	bool rc = false;
+	const char *f;
+	bool isdir;
+    char *p, *fullPath = (char *)calloc(1, 512);
+	sprintf(fullPath, "%s/", directoryName);
+	p = fullPath + strlen(fullPath);
+	
+	while ( (f = FileSystem_readDirectory(dh, &isdir)) ) {
+		if ( strcmp(f, ".") == 0 ) continue;
+		if ( strcmp(f, "..") == 0 ) continue;
+		strcpy(p, f);
+		rc = (isdir)? 
+			FileSystem_deleteDirectory(fullPath) : FileSystem_deleteFile(fullPath);
+		if (rc == false) {
+			goto toexit;
+		}
+	}
+
+toexit:
+	free(fullPath);
+	FileSystem_closeDirectory(dh);
+	return (rmdir(directoryName) == 0)? true : false;
+}
+
+
+bool FileSystem_moveDirectory(const char *dirName, const char *newDirName)
+{
+	return (rename(dirName, newDirName) == 0)? true : false;
 }
 
 #endif // __linux__

@@ -15,7 +15,7 @@ struct sThread {
 	int state;
 	bool autodestroy;
 	Signal killSignal;
-	Signal cancelSignal;
+	Signal cs;
 };
 
 
@@ -93,29 +93,29 @@ static DWORD WINAPI destroyAutomaticThreadRunner(LPVOID parameter)
 static DWORD WINAPI threadRunner(LPVOID parameter)
 {
 	Thread self = (Thread) parameter;
-	return (DWORD)self->function(self->parameter);
+	return (DWORD)((size_t)self->function(self->parameter));
 }
 
 Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
 {
-	Thread thread = (Thread) calloc(1, sizeof(struct sThread));
+	Thread self = (Thread) calloc(1, sizeof(struct sThread));
 
-	if (thread != NULL) {
-		thread->cancelSignal = Signal_create();
-		if (thread->cancelSignal) {
-			thread->parameter = parameter;
-			thread->function = function;
-			thread->state = 0;
-			thread->autodestroy = autodestroy;
-			thread->handle = CreateThread(
+	if (self != NULL) {
+		self->cs = Signal_create();
+		if (self->cs) {
+			self->parameter = parameter;
+			self->function = function;
+			self->state = 0;
+			self->autodestroy = autodestroy;
+			self->handle = CreateThread(
 					0, (SIZE_T)stackSize, 
 					((autodestroy)? destroyAutomaticThreadRunner : threadRunner), 
-					(LPVOID)thread, CREATE_SUSPENDED, (LPDWORD)&thread->threadId
+					(LPVOID)self, CREATE_SUSPENDED, (LPDWORD)&self->threadId
 			);
 		}
 	}
 
-	return thread;
+	return self;
 }
 
 void Thread_start(Thread self)
@@ -132,6 +132,7 @@ void Thread_destroy(Thread self)
 		WaitForSingleObject(self->handle, INFINITE);
 	}
 	CloseHandle(self->handle);
+	Signal_destroy(self->cs);
 	free(self);
 }
 
@@ -143,6 +144,7 @@ void Thread_sleep(int millies)
 void Thread_yield(void)
 {
 	SwitchToThread();
+	YieldProcessor();
 }
 
 void Thread_cancel(Thread self)
@@ -151,7 +153,7 @@ void Thread_cancel(Thread self)
 	if (self->killSignal)
 		Signal_raise(self->killSignal);
 	if (!self->autodestroy)
-		Signal_raise(self->cancelSignal);
+		Signal_raise(self->cs);
 }
 
 void Thread_testCancel(Thread self)
@@ -160,8 +162,8 @@ void Thread_testCancel(Thread self)
 	if (self->killSignal)
 		Signal_end(self->killSignal);
 	if (!self->autodestroy) {
-		if (Signal_event(self->cancelSignal)) {
-			Signal_end(self->cancelSignal);
+		if (Signal_event(self->cs)) {
+			Signal_end(self->cs);
 			ExitThread(0);
 		}
 	}
@@ -197,7 +199,7 @@ void Signal_raise(Signal self)
 	if (self == NULL) return;
 	HalShFdesc fd = (HalShFdesc)self;
 	uint8_t buf[1];
-	DgramSocket_write(fd->i, buf, EVENT_DSIZE);
+	ClientSocket_write(fd->i, buf, EVENT_DSIZE);
 }
 
 void Signal_end(Signal self)
@@ -205,14 +207,14 @@ void Signal_end(Signal self)
 	if (self == NULL) return;
 	HalShFdesc fd = (HalShFdesc)self;
 	uint8_t buf[1];
-	while (DgramSocket_read(fd->e, buf, EVENT_DSIZE));
+	while (ClientSocket_read(fd->e, buf, EVENT_DSIZE));
 }
 
 bool Signal_event(Signal self)
 {
 	if (self == NULL) return false;
 	HalShFdesc fd = (HalShFdesc)self;
-	return (DgramSocket_readAvailable(fd->e) > 0);
+	return (ClientSocket_readAvailable(fd->e) > 0);
 }
 
 void Signal_destroy(Signal self)

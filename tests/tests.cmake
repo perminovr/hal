@@ -1,0 +1,66 @@
+
+
+add_executable(test_base tests/test_base.c)
+add_executable(test_time tests/test_time.c)
+add_executable(test_poll tests/test_poll.c)
+add_executable(test_halpoll tests/test_halpoll.c)
+add_executable(test_fs tests/test_fs.c)
+add_executable(test_timer tests/test_timer.c)
+add_executable(test_thread tests/test_thread.c)
+
+target_link_libraries(test_base PUBLIC libhal)
+target_link_libraries(test_time PUBLIC libhal)
+target_link_libraries(test_poll PUBLIC libhal)
+target_link_libraries(test_halpoll PUBLIC libhal)
+target_link_libraries(test_fs PUBLIC libhal)
+target_link_libraries(test_timer PUBLIC libhal)
+target_link_libraries(test_thread PUBLIC libhal)
+
+
+
+add_test(test_base_isinv test_base 1)
+add_test(test_base_iseq test_base 2)
+add_test(test_base_ipv40 test_base 3)
+add_test(test_base_ipv4f test_base 4)
+add_test(test_base_ipv4 test_base 5)
+add_test(test_base_portrng test_base 6)
+add_test(test_base_porteq test_base 7)
+
+add_test(test_time_time test_time 1)
+
+add_test(test_poll_to test_poll 1)
+add_test(test_poll_ev test_poll 2)
+add_test(test_poll_inv test_poll 3)
+add_test(test_poll_pout test_poll 4)
+add_test(test_polls_to test_poll 5)
+add_test(test_polls_ev test_poll 6)
+add_test(test_polls_pout test_poll 7)
+add_test(test_poll_pinout test_poll 8)
+add_test(test_polls_pinout test_poll 9)
+
+add_test(test_halpoll_to test_halpoll 1)
+add_test(test_halpoll_ev test_halpoll 2)
+add_test(test_halpoll_dsbl test_halpoll 3)
+add_test(test_halpoll_pout test_halpoll 4)
+add_test(test_halpoll_pinout test_halpoll 5)
+add_test(test_halpoll_rm test_halpoll 6)
+add_test(test_halpoll_upd test_halpoll 7)
+
+add_test(test_fs_nexst test_fs 1)
+add_test(test_fs_rw test_fs 2)
+add_test(test_fs_rnsz test_fs 3)
+add_test(test_fs_dir test_fs 4)
+add_test(test_fs_move test_fs 5)
+
+add_test(test_timer_to test_timer 1)
+add_test(test_timer_per test_timer 2)
+add_test(test_timer_shot test_timer 3)
+
+add_test(test_thread_slp test_thread 1)
+add_test(test_thread_cncl test_thread 2)
+add_test(test_thread_adest test_thread 3)
+add_test(test_thread_sem test_thread 4)
+add_test(test_thread_sem2 test_thread 5)
+add_test(test_thread_mu test_thread 6)
+add_test(test_thread_mu2 test_thread 7)
+add_test(test_thread_sig test_thread 8)

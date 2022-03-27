@@ -8,8 +8,8 @@
 uint64_t Hal_getTimeInMs(void)
 {
 	struct timeval now;
-	gettimeofday(&now, NULL);
-	return ((uint64_t) now.tv_sec * 1000LL) + (now.tv_usec / 1000);
+	int rc = gettimeofday(&now, NULL);
+	return ((rc == 0)? (((uint64_t) now.tv_sec * 1000LL) + (now.tv_usec / 1000)) : 0);
 }
 
 #endif // __linux__

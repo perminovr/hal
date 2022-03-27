@@ -81,7 +81,7 @@ UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port);
  *
  * \param self the socket instance
  * \param ip ip v4 of the group
- * \param iface the ID of the Ethernet interface
+ * \param iface Local IP address of the interface (for windows only) or the ID of the Ethernet interface (for windows and other)
  *
  * \return true in case of success, false otherwise
  */
@@ -157,7 +157,7 @@ EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, ui
  *
  * The result are the six bytes that make up the Ethernet MAC address.
  *
- * \param iface the ID of the Ethernet interface
+ * \param iface Local IP address of the interface (for windows only) or the ID of the Ethernet interface (for windows and other)
  * \param addr pointer to a buffer to store the MAC address. At least 6 bytes length
  *
  * \return true in case of success, false otherwise

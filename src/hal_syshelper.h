@@ -3,14 +3,15 @@
 #define HAL_SYSHELPER_H
 
 #include "hal_base.h"
-#include "hal_socket_dgram.h"
+#include "hal_socket_stream.h"
 
 typedef struct sHalShFdesc *HalShFdesc;
 struct sHalShFdesc {
     unidesc h; // system object
     struct { // helper socks
-        DgramSocket i; // internal
-        DgramSocket e; // external
+        ServerSocket s;
+        ClientSocket i; // internal
+        ClientSocket e; // external
     };
 };
 

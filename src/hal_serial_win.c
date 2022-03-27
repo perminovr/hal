@@ -160,7 +160,7 @@ bool SerialPort_open(SerialPort self)
 	}
 	
 	unidesc ud; ud.u64 = (uint64_t)self->h;
-	int charsSpacing = (8000.0f / (float)self->baudRate) * 5; // 5 symbols
+	int charsSpacing = (int)((8000.0f / (float)self->baudRate) * 5); // 5 symbols
 	charsSpacing += (charsSpacing)? 0 : 1;
 	self->fdh = HalShFdescHelper_create(ud, 256, charsSpacing);
 	if (!self->fdh) {

@@ -19,6 +19,7 @@ int Hal_poll(Pollfd pfd, unsigned long int size, int timeout)
 	for (i = 0; i < size; ++i) {
 		lpfd[i].fd = pfd[i].fd.i32;
 		lpfd[i].events = pfd[i].events; // hal events compatible with linux events
+		lpfd[i].revents = 0;
 	}
 
 	ret = poll(lpfd, size, timeout);
@@ -27,6 +28,23 @@ int Hal_poll(Pollfd pfd, unsigned long int size, int timeout)
 		pfd[i].revents = lpfd[i].revents; // hal revents compatible with linux revents
 	}
 
+	return ret;
+}
+
+
+int Hal_pollSingle(unidesc fd, int events, int *revents, int timeout)
+{
+	if (Hal_unidescIsInvalid(fd)) return -1;
+
+	int ret = 0;
+	struct pollfd lpfd;
+	lpfd.fd = fd.i32;
+	lpfd.events = events;
+	lpfd.revents = 0;
+
+	ret = poll(&lpfd, 1, timeout);
+	if (revents) *revents = lpfd.revents;
+	
 	return ret;
 }
 
@@ -166,6 +184,7 @@ bool HalPoll_update_3(HalPoll self, unidesc fd, void *user, PollfdReventsHandler
 bool HalPoll_update_4(HalPoll self, unidesc old_fd, unidesc new_fd)
 {
 	if (self == NULL) return false;
+	if (Hal_unidescIsInvalid(new_fd)) return false;
 	if (Hal_unidescIsEqual(&old_fd, &new_fd)) return true;
 	int i = getFdIndex(self, old_fd);
 	if (i == self->size) return false;
@@ -233,7 +252,7 @@ bool HalPoll_remove(HalPoll self, unidesc fd)
 			HALDEFCPP(self->objects[i].cpphandler = self->objects[i+1].cpphandler;)
 		}
 		i = self->size-1;
-		setSysPollfd(self, i, -1, 0, 0);
+		setSysPollfd(self, i, Hal_getInvalidUnidesc().i32, 0, 0);
 		self->objects[i].object = NULL;
 		self->objects[i].user = NULL;
 		self->objects[i].handler = NULL;

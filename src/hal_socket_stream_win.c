@@ -3,6 +3,7 @@
 
 #include "hal_socket_stream.h"
 #include "hal_thread.h"
+#include "hal_syshelper.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mswsock.h>
@@ -42,10 +43,21 @@ static inline void setSocketNonBlocking(SOCKET s)
 	ioctlsocket(s, FIONBIO, &val);
 }
 
+static inline int getSocketAvailableToRead(SOCKET s)
+{
+    u_long val = 0;
+	if (ioctlsocket(s, FIONREAD, &val) == 0) {
+		return (int)val;
+	}
+	return -1;
+}
+
 
 ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uint16_t port)
 {
 	if (address == NULL || port == 0) return NULL;
+
+	HalShSys_init();
 
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET) return NULL;
@@ -86,6 +98,8 @@ exit_error:
 
 ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 {
+	HalShSys_init();
+
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET) return NULL;
 
@@ -132,13 +146,13 @@ void TcpClientSocket_activateTcpKeepAlive(ClientSocket self, int idleTime, int i
 	int optval;
 	socklen_t optlen = sizeof(optval);
 	optval = 1;
-	setsockopt(self->s, SOL_SOCKET, SO_KEEPALIVE, &optval, optlen);
+	setsockopt(self->s, SOL_SOCKET, SO_KEEPALIVE, (const char *)&optval, optlen);
 	optval = idleTime;
-	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPIDLE, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPIDLE, (const char *)&optval, optlen);
 	optval = interval;
-	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPINTVL, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPINTVL, (const char *)&optval, optlen);
 	optval = count;
-	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPCNT, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_KEEPCNT, (const char *)&optval, optlen);
 }
 
 void TcpClientSocket_activateTcpNoDelay(ClientSocket self)
@@ -146,7 +160,7 @@ void TcpClientSocket_activateTcpNoDelay(ClientSocket self)
 	if (self == NULL) return;
 	int optval = 1;
 	socklen_t optlen = sizeof(optval);
-	setsockopt(self->s, IPPROTO_TCP, TCP_NODELAY, &optval, optlen);
+	setsockopt(self->s, IPPROTO_TCP, TCP_NODELAY, (const char *)&optval, optlen);
 }
 
 void TcpClientSocket_setUnacknowledgedTimeout(ClientSocket self, int timeoutInMs)
@@ -159,7 +173,7 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 {
 	if (address == NULL) return NULL;
 
-	unlink(address);
+	DeleteFileA(address);
 
 	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	ServerSocket self = TcpServerSocket_create(maxConnections, HAL_LOCAL_SOCK_ADDR, port);
@@ -174,6 +188,8 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 
 ClientSocket LocalClientSocket_create(void)
 {
+	HalShSys_init();
+
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET) return NULL;
 
@@ -301,6 +317,7 @@ bool ServerSocket_destroy(ServerSocket self)
 	free(self->clients.self);
 	closeAndShutdownSocket(self->s);
 	self->s = INVALID_SOCKET;
+	HalShSys_deinit();
 	free(self);
 	return true;
 }
@@ -365,7 +382,7 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	if (select(0, NULL, &fdSet , NULL, &timeout) == 1) {
 		int so_error;
 		socklen_t len = sizeof so_error;
-		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) {
+		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) != 0) {
 			if (so_error == 0) {
 				return true;
 			}
@@ -373,6 +390,15 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	}
 
 	return false;
+}
+
+void ClientSocket_close(ClientSocket self) // hal internal use only
+{
+	if (self == NULL) return;
+	if (self->s != INVALID_SOCKET) {
+		closeAndShutdownSocket(self->s);
+		self->s = INVALID_SOCKET;
+	}
 }
 
 bool ClientSocket_reset(ClientSocket self)
@@ -394,7 +420,7 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 	fd_set fdSet;
 	struct timeval timeout;
 
-	bzero(&timeout, sizeof(struct timeval));
+	memset(&timeout, 0, sizeof(struct timeval));
 
 	FD_ZERO(&fdSet);
 	FD_SET(self->s, &fdSet);
@@ -405,7 +431,7 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 		/* Check if connection is established */
 		int so_error;
 		socklen_t len = sizeof(so_error);
-		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, &so_error, &len) != 0) {
+		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) != 0) {
 			if (so_error == 0)
 				return SOCKET_STATE_CONNECTED;
 		}
@@ -496,6 +522,12 @@ bool ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address
 	return false;
 }
 
+int ClientSocket_readAvailable(ClientSocket self)
+{
+	if (self == NULL) return -1;
+	return getSocketAvailableToRead(self->s);
+}
+
 void ClientSocket_destroy(ClientSocket self)
 {
 	if (self == NULL) return;
@@ -504,6 +536,7 @@ void ClientSocket_destroy(ClientSocket self)
 	if (self->server) {
 		ServerSocket_deleteClient(self->server, self);
 	} else {
+		HalShSys_deinit();
 		free(self);
 	}
 }

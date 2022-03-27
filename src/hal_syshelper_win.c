@@ -5,10 +5,8 @@
 #include <windows.h>
 
 #include "hal_syshelper.h"
+#include "hal_poll.h"
 #include "hal_thread.h"
-
-// hal internal use only
-bool DgramSocket_close(DgramSocket self);
 
 
 struct sHalShFdescHelper {
@@ -23,14 +21,14 @@ struct sHalShFdescHelper {
 static void *HalShFdescHelper_loop(void *p)
 {
     HalShFdescHelper self = (HalShFdescHelper)p;
-    uint64_t ifd = DgramSocket_getDescriptor(self->fd->i).u64;
-    HANDLE hset[3] = { 
-        (HANDLE)(Signal_getDescriptor(self->wkupSig).u64), 
+    uint64_t ifd = ClientSocket_getDescriptor(self->fd->i).u64;
+    HANDLE hset[3] = {
+        (HANDLE)(Signal_getDescriptor(self->wkupSig).u64),
         (HANDLE)(ifd),
         (HANDLE)(self->fd->h.u64),
     };
     DWORD rc, i, it, bytes;
-    for (;;) { 
+    for (;;) {
         rc = WaitForMultipleObjects(3, hset, FALSE, INFINITE);
         if (rc != WAIT_TIMEOUT && rc != WAIT_FAILED) {
             if (rc < WAIT_ABANDONED_0) {
@@ -56,14 +54,15 @@ static void *HalShFdescHelper_loop(void *p)
                             if (WaitForSingleObject(rh, 0) == WAIT_OBJECT_0) { // check the data is available
                                 bytes = 0;
                                 if (ReadFile(rh, (LPVOID)(self->buf+it), 1, &bytes, NULL) == FALSE) {
-                                    DgramSocket_close(self->fd->e); // emit application about broken handle
+                                    ClientSocket_destroy(self->fd->i); // emit application about broken handle
+                                    self->fd->i = NULL;
                                     Thread_testCancel(self->thr); // clear before
                                     ExitThread(0); // nothing canbe done
                                 }
                                 if (bytes != 1) break;
                                 if (++it >= self->bufSize) break;
                                 rc = 0; // byte received we can wait a little for another one (pauseCharMs)
-                            } else { 
+                            } else {
                                 if (rc == 0 && i == 2 && self->pauseCharMs > 0) { // only for sys handle
                                     Thread_sleep(self->pauseCharMs);
                                     rc = 1;
@@ -98,7 +97,7 @@ HalShFdescHelper HalShFdescHelper_create(unidesc h, uint32_t wrBufSize, int paus
 
     self->wkupSig = Signal_create();
     if (!self->wkupSig) goto exit_err;
-    
+
     self->thr = Thread_create(0xffff, HalShFdescHelper_loop, self, false);
     if (!self->fd) goto exit_err;
 
@@ -116,18 +115,18 @@ exit_err:
 int HalShFdescHelper_write(HalShFdescHelper self, const uint8_t *buf, int size)
 {
     if (!self) return -1;
-    return DgramSocket_write(self->fd->e, buf, size);
+    return ClientSocket_write(self->fd->e, buf, size);
 }
 
 int HalShFdescHelper_read(HalShFdescHelper self, uint8_t *buf, int size)
 {
     if (!self) return -1;
-    return DgramSocket_read(self->fd->e, buf, size);
+    return ClientSocket_read(self->fd->e, buf, size);
 }
 
 void HalShFdescHelper_destroy(HalShFdescHelper self)
 {
-    if (!self) return NULL;
+    if (!self) return;
     if (self->thr) {
         Thread_cancel(self->thr);
         Signal_raise(self->wkupSig);
@@ -146,15 +145,15 @@ HalShFdesc HalShFdescHelper_getDescriptor(HalShFdescHelper self)
 }
 
 
-static DgramSocket getLocalSocket(char *buf)
+static ServerSocket getLocalServer(char *buf)
 {
-    DgramSocket s = NULL;
+    ServerSocket s = NULL;
     int attempts = 100;
     while (attempts--) {
-        if (GetTempFileNameA((LPCSTR)"\\.", (LPCSTR)"soc", 0, (LPCSTR)buf) == 0) return NULL;
-        LocalDgramSocket_unlinkAddress(buf);
-        s = LocalDgramSocket_create(buf);
+        if (GetTempFileNameA((LPCSTR)"\\.", (LPCSTR)"soc", 0, (LPSTR)buf) == 0) return NULL;
+        s = LocalServerSocket_create(1, buf);
         if (s) {
+            ServerSocket_listen(s, 1);
             return s;
         }
         Thread_sleep(1);
@@ -164,43 +163,49 @@ static DgramSocket getLocalSocket(char *buf)
 
 HalShFdesc HalShFdesc_create(unidesc h)
 {
-    DgramSocket e, i;
-    char internal_name[MAX_PATH];
-    char external_name[MAX_PATH];
-    union uDgramSocketAddress addr;
+    ServerSocket s;
+    ClientSocket e, i;
+    char server_name[MAX_PATH];
+    union uClientSocketAddress addr;
 
-    if ( (i = getLocalSocket(internal_name)) == NULL) return NULL;
-    if ( (e = getLocalSocket(external_name)) == NULL) return NULL;
+    if ( (s = getLocalServer(server_name)) == NULL) goto exit_error;
 
-    strncpy(addr.address, internal_name, sizeof(addr.address)-1);
-    DgramSocket_setRemote(e, &addr);
-    strncpy(addr.address, external_name, sizeof(addr.address)-1);
-    DgramSocket_setRemote(i, &addr);
+    e = LocalClientSocket_create();
+    if (e == NULL) goto exit_error;
+    strncpy(addr.address, server_name, sizeof(addr.address)-1);
+    ClientSocket_connectAsync(e, &addr);
+    if ( Hal_pollSingle(ServerSocket_getDescriptor(s), HAL_POLLIN, NULL, 100) <= 0 )
+        goto exit_error;
+    i = ServerSocket_accept(s);
+    if (i == NULL) goto exit_error;
 
     HalShFdesc ret = (HalShFdesc)calloc(1, sizeof(struct sHalShFdesc));
     if (ret) {
         ret->h = h;
         ret->e = e;
+        ret->s = s;
         ret->i = i;
-    } else {
-        if (e) DgramSocket_destroy(e);
-        if (i) DgramSocket_destroy(i);
+        return ret;
     }
-    return ret;
+
+exit_error:
+    if (e) ClientSocket_destroy(e);
+    if (s) ServerSocket_destroy(s);
+    return NULL;
 }
 
 void HalShFdesc_destroy(HalShFdesc self)
 {
-    if (!self) return NULL;
-    if (self->e) DgramSocket_destroy(self->e);
-    if (self->i) DgramSocket_destroy(self->i);
+    if (!self) return;
+    if (self->e) ClientSocket_destroy(self->e);
+    if (self->s) ServerSocket_destroy(self->s);
     free(self);
 }
 
 unidesc HalShFdesc_getDescriptor(HalShFdesc self)
 {
     if (self) {
-        return DgramSocket_getDescriptor(self->e);
+        return ClientSocket_getDescriptor(self->e);
     }
     return Hal_getInvalidUnidesc();
 }
@@ -212,8 +217,9 @@ void HalShSys_init(void)
 {
     if (HalShSys_initCnt == 0) {
         WSADATA wsa;
+		WORD ver = MAKEWORD(2,2);
         timeBeginPeriod(1);
-        WSAStartup(MAKEWORD(2, 2), &wsa);
+        WSAStartup(ver, &wsa);
     }
     HalShSys_initCnt++;
 }

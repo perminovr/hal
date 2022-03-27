@@ -74,6 +74,15 @@ static inline void setSocketNonBlocking(int fd)
 	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+static inline int getSocketAvailableToRead(int fd)
+{
+    int val = 0;
+	if (ioctl(fd, FIONREAD, &val) == 0) {
+		return val;
+	}
+	return -1;
+}
+
 
 ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uint16_t port)
 {
@@ -244,7 +253,7 @@ ClientSocket LocalClientSocket_create(void)
 		setSocketNonBlocking(fd);
 		return self;
 	}
-	
+
 // exit_error:
 	close(fd);
 	return NULL;
@@ -432,6 +441,15 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	return false;
 }
 
+void ClientSocket_close(ClientSocket self) // hal internal use only
+{
+	if (self == NULL) return;
+	if (self->fd >= 0) {
+		closeAndShutdownSocket(self->fd);
+		self->fd = -1;
+	}
+}
+
 bool ClientSocket_reset(ClientSocket self)
 {
 	if (self == NULL) return false;
@@ -555,6 +573,12 @@ bool ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address
 		return convertAddressToStr(&addr, address);
 	}
 	return false;
+}
+
+int ClientSocket_readAvailable(ClientSocket self)
+{
+	if (self == NULL) return -1;
+	return getSocketAvailableToRead(self->fd);
 }
 
 void ClientSocket_destroy(ClientSocket self)

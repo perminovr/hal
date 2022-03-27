@@ -48,7 +48,7 @@
 # ifdef EXPORT_FUNCTIONS_FOR_DLL
 #  define HAL_API __declspec(dllexport)
 # else
-#  define HAL_API /*__declspec(dllimport)*/
+#  define HAL_API extern /*__declspec(dllimport)*/
 # endif
 # define HAL_INTERNAL
 #else
@@ -56,7 +56,7 @@
 #  define HAL_API extern __attribute__ ((visibility ("default")))
 #  define HAL_INTERNAL  __attribute__ ((visibility ("hidden")))
 # else
-#  define HAL_API
+#  define HAL_API extern
 #  define HAL_INTERNAL
 # endif
 #endif

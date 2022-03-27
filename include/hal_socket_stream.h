@@ -309,6 +309,16 @@ HAL_API bool
 ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address);
 
 /**
+ * \brief Get the number of bytes available for reading from the socket
+ *
+ * \param self the socket instance
+ *
+ * \return the number of bytes available for reading or -1 if an error occurred
+ */
+HAL_API int
+ClientSocket_readAvailable(ClientSocket self);
+
+/**
  * \brief destroy a socket (close the socket if a connection is established)
  *
  * This function shall close the connection (if one is established) and free all

@@ -54,6 +54,8 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	if (self == NULL) return false;
 	if (timeout == NULL) return false;
 
+	Timer_endEvent(self);
+
 	UINT delay = Timer_getDelay(timeout);
 	bool ret = Timer_set(self, delay, false);
 	if (ret) { self->lastTimeout = delay; }
@@ -70,6 +72,8 @@ bool Timer_setPeriod(Timer self, AccurateTime_t *period)
 {
 	if (self == NULL) return false;
 	if (period == NULL) return false;
+
+	Timer_endEvent(self);
 
 	UINT delay = Timer_getDelay(period);
 	return Timer_set(self, delay, true);
@@ -118,15 +122,68 @@ unidesc Timer_getDescriptor(Timer self)
 }
 
 
-// todo 
+typedef struct sTimerSingleShotEntry * TimerSingleShotEntry;
+struct sTimerSingleShotEntry {
+	Timer self;
+	TimerSingleShotEntry next;
+	bool active;
+};
+typedef struct {
+	Mutex mu;
+	TimerSingleShotEntry head;
+} TimerSingleShotList;
+static TimerSingleShotList tssList;
 
-unidesc Timer_setSingleShot(AccurateTime_t *time)
+unidesc Timer_setSingleShot(AccurateTime_t *timeout)
 {
-	return Hal_getInvalidUnidesc();
+	TimerSingleShotEntry tsse;
+	unidesc ret = Hal_getInvalidUnidesc();
+
+	// init mutex
+	if (!tssList.mu) { tssList.mu = Mutex_create(); }
+
+	Mutex_lock(tssList.mu);
+
+	// find free entry
+	for (tsse = tssList.head; tsse; tsse = tsse->next) {
+		if (tsse->active == false) {
+			break;
+		}
+	}
+
+	// new entry
+	if (!tsse) {
+		TimerSingleShotEntry t;
+		tsse = (TimerSingleShotEntry)calloc(1, sizeof(struct sTimerSingleShotEntry));
+		if (!tsse) { goto toexit; }
+		tsse->self = Timer_create();
+		if (!tsse->self) { free(tsse); goto toexit; }
+		for (t = tssList.head; t && t->next; t = t->next) {}
+		if (t) { t->next = tsse; }
+		else { tssList.head = tsse; }
+	}
+	
+	tsse->active = true;
+	Timer_setTimeout(tsse->self, timeout);
+	ret = Timer_getDescriptor(tsse->self);
+	
+toexit:
+	Mutex_unlock(tssList.mu);
+	return ret;
 }
 
 void Timer_endSingleShot(unidesc desc)
 {
+	Mutex_lock(tssList.mu);
+	for (TimerSingleShotEntry tsse = tssList.head; tsse; tsse = tsse->next) {
+		unidesc fd = Timer_getDescriptor(tsse->self);
+		if ( Hal_unidescIsEqual(&fd, &desc) ) {
+			Timer_endEvent(tsse->self);
+			tsse->active = false;
+			break;
+		}
+	}
+	Mutex_unlock(tssList.mu);
 }
 
 #endif // _WIN32 || _WIN64

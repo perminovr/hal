@@ -47,7 +47,7 @@ uint16_t Hal_generatePort(const char *name, uint16_t min, uint16_t max)
     }
     uint16_t diff = max - min;
     if (diff < 999) return 0;
-    int len = strlen(name);
+    int len = (int)strlen(name);
     while (ret < min || ret > max) {
         uint8_t xor = 0;
         const char *p = name;
