@@ -45,6 +45,7 @@
 struct sClientSocket {
 	int fd;
 	int domain;
+	bool inreset;
 	//
 	ServerSocket server;
 	int idx;
@@ -92,6 +93,7 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 	if (fd < 0) return NULL;
 
 	struct sockaddr_in serverAddress;
+	Mutex mu = NULL;
 
 	if (!prepareSocketAddress(address, port, &serverAddress)) {
 		goto exit_error;
@@ -100,7 +102,14 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 		goto exit_error;
 	}
 
-	Mutex mu = Mutex_create();
+	// disable TIME_WAIT
+	struct linger lin = {
+		.l_onoff = 1,
+		.l_linger = 0
+	};
+	if (setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) < 0) goto exit_error;
+
+	mu = Mutex_create();
 	if (!mu) {
 		goto exit_error;
 	}
@@ -151,6 +160,7 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_INET;
+		self->inreset = true;
 		self->server = NULL;
 		self->idx = -1;
 		setSocketNonBlocking(fd);
@@ -248,6 +258,7 @@ ClientSocket LocalClientSocket_create(void)
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_UNIX;
+		self->inreset = true;
 		self->server = NULL;
 		self->idx = -1;
 		setSocketNonBlocking(fd);
@@ -290,6 +301,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 					conSocket = &(self->clients.self[i]);
 					conSocket->fd = fd;
 					conSocket->domain = addr.ss_family;
+					conSocket->inreset = false;
 					conSocket->server = self;
 					conSocket->idx = i;
 					self->clients.size++;
@@ -344,6 +356,7 @@ static void ServerSocket_deleteClient(ServerSocket self, ClientSocket client)
 	if (client->idx >= 0) {
 		Mutex_lock(self->clients.mu);
 		{
+			client->inreset = true;
 			client->server = NULL;
 			client->idx = -1;
 			self->clients.size--;
@@ -358,6 +371,20 @@ static inline void closeAndShutdownSocket(int fd)
 		shutdown(fd, SHUT_RDWR);
 		close(fd);
 	}
+}
+
+void ServerSocket_closeClients(ServerSocket self)
+{
+	Mutex_lock(self->clients.mu);
+	if (self->clients.size > 0) {
+		for (int i = 0; i < self->clients.maxConnections; ++i) {
+			ClientSocket c = &(self->clients.self[i]);
+			if (c->server != NULL) {
+				ServerSocket_deleteClient(self, c);
+			}
+		}
+	}
+	Mutex_unlock(self->clients.mu);
 }
 
 bool ServerSocket_destroy(ServerSocket self)
@@ -409,6 +436,7 @@ bool ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress addr
 		} break;
 	}
 
+	self->inreset = false;
 	return true; /* is connecting or already connected */
 }
 
@@ -438,6 +466,7 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 		}
 	}
 
+	self->inreset = true;
 	return false;
 }
 
@@ -447,6 +476,7 @@ void ClientSocket_close(ClientSocket self) // hal internal use only
 	if (self->fd >= 0) {
 		closeAndShutdownSocket(self->fd);
 		self->fd = -1;
+		self->inreset = true;
 	}
 }
 
@@ -456,6 +486,7 @@ bool ClientSocket_reset(ClientSocket self)
 	if (self->fd >= 0 && self->server == NULL) {
 		closeAndShutdownSocket(self->fd);
 		self->fd = socket(self->domain, SOCK_STREAM, 0);
+		self->inreset = true;
 		if (self->fd >= 0) {
 			return true;
 		}
@@ -482,7 +513,7 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 		socklen_t len = sizeof(so_error);
 		if (getsockopt(self->fd, SOL_SOCKET, SO_ERROR, &so_error, &len) >= 0) {
 			if (so_error == 0)
-				return SOCKET_STATE_CONNECTED;
+				return (self->inreset)? SOCKET_STATE_IDLE : SOCKET_STATE_CONNECTED;
 		}
 		return SOCKET_STATE_FAILED;
 	} else if (selectVal == 0) {

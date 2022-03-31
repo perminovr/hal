@@ -5,6 +5,8 @@
 #include "hal_thread.h"
 #include "hal_timer.h"
 
+#define err() printf("%s:%d\n", __FILE__, __LINE__)
+
 static int poll_cb_passed = 0;
 static int poll_cb_revents = 0;
 void poll_cb(void *user, void *object, int revents)
@@ -16,6 +18,8 @@ void poll_cb(void *user, void *object, int revents)
 
 int main(int argc, const char **argv)
 {
+	int test = 0;
+	test = atoi(argv[1]);
     int rc;
     Signal s = Signal_create();
     Timer t = Timer_create();
@@ -25,12 +29,12 @@ int main(int argc, const char **argv)
     HalPoll_update(h, Signal_getDescriptor(s), HAL_POLLIN, object, user, poll_cb);
     HalPoll_update(h, Timer_getDescriptor(t), HAL_POLLIN, object, user, poll_cb);
     uint64_t ts0 = Hal_getTimeInMs();
-    switch (atoi(argv[1])) {
+    switch (test) {
         case 1: { // timeout
             rc = HalPoll_wait(h, 500);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc != 0) return 1;
-            if (ts < 480 || ts > 520) return 1;
+            if (rc != 0) { err(); return 1; }
+            if (ts < 480 || ts > 520) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -39,10 +43,10 @@ int main(int argc, const char **argv)
             Timer_setTimeout(t, &at);
             rc = HalPoll_wait(h, 1000);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts < 180 || ts > 220) return 1;
-            if ( (poll_cb_revents&HAL_POLLIN) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts < 180 || ts > 220) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLIN) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -52,10 +56,10 @@ int main(int argc, const char **argv)
             HalPoll_update_1(h, Signal_getDescriptor(s), 0);
             rc = HalPoll_wait(h, 1000);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts < 80 || ts > 120) return 1;
-            if ( (poll_cb_revents&HAL_POLLIN) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts < 80 || ts > 120) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLIN) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -63,10 +67,10 @@ int main(int argc, const char **argv)
             HalPoll_update_1(h, Signal_getDescriptor(s), HAL_POLLIN|HAL_POLLOUT);
             rc = HalPoll_wait(h, 500);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts > 20) return 1;
-            if ( (poll_cb_revents&HAL_POLLOUT) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts > 20) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLOUT) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -75,11 +79,11 @@ int main(int argc, const char **argv)
             HalPoll_update_1(h, Signal_getDescriptor(s), HAL_POLLIN|HAL_POLLOUT);
             rc = HalPoll_wait(h, 500);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts > 20) return 1;
-            if ( (poll_cb_revents&HAL_POLLOUT) == 0) return 1;
-            if ( (poll_cb_revents&HAL_POLLIN) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts > 20) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLOUT) == 0) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLIN) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -89,10 +93,10 @@ int main(int argc, const char **argv)
             HalPoll_remove(h, Signal_getDescriptor(s));
             rc = HalPoll_wait(h, 1000);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts < 80 || ts > 120) return 1;
-            if ( (poll_cb_revents&HAL_POLLIN) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts < 80 || ts > 120) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLIN) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
@@ -115,14 +119,14 @@ int main(int argc, const char **argv)
             Timer_setTimeout(t2, &at);
             rc = HalPoll_wait(h, 1000);
             uint64_t ts = Hal_getTimeInMs() - ts0;
-            if (rc <= 0) return 1;
-            if (ts < 180 || ts > 220) return 1;
-            if ( (poll_cb_revents&HAL_POLLIN) == 0) return 1;
-            if ( poll_cb_passed == 0) return 1;
+            if (rc <= 0) { err(); return 1; }
+            if (ts < 180 || ts > 220) { err(); return 1; }
+            if ( (poll_cb_revents&HAL_POLLIN) == 0) { err(); return 1; }
+            if ( poll_cb_passed == 0) { err(); return 1; }
             HalPoll_destroy(h);
             return 0;
         } break;
     }
 
-    return 1;
+    { err(); return 1; }
 }

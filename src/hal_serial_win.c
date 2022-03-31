@@ -105,17 +105,48 @@ bool SerialPort_open(SerialPort self)
 	}
 
 	switch (self->baudRate) {
+		#ifdef CBR_110
 		case 110: baudrate = CBR_110; break;
+		#endif
+		#ifdef CBR_300
 		case 300: baudrate = CBR_300; break;
+		#endif
+		#ifdef CBR_600
 		case 600: baudrate = CBR_600; break;
+		#endif
+		#ifdef CBR_1200
 		case 1200: baudrate = CBR_1200; break;
+		#endif
+		#ifdef CBR_2400
 		case 2400: baudrate = CBR_2400; break;
+		#endif
+		#ifdef CBR_4800
 		case 4800: baudrate = CBR_4800; break;
+		#endif
+		#ifdef CBR_9600
 		case 9600: baudrate = CBR_9600; break;
+		#endif
+		#ifdef CBR_19200
 		case 19200: baudrate = CBR_19200; break;
+		#endif
+		#ifdef CBR_38400
 		case 38400:  baudrate = CBR_38400; break;
+		#endif
+		#ifdef CBR_57600
 		case 57600: baudrate = CBR_57600; break;
+		#endif
+		#ifdef CBR_115200
 		case 115200: baudrate = CBR_115200; break;
+		#endif
+		#ifdef CBR_230400
+		case 230400: baudrate = CBR_115200; break;
+		#endif
+		#ifdef CBR_460800
+		case 460800: baudrate = CBR_460800; break;
+		#endif
+		#ifdef CBR_921600
+		case 921600: baudrate = CBR_921600; break;
+		#endif
 		default:
 			baudrate = CBR_9600;
 			self->lastError = SERIAL_PORT_ERROR_INVALID_BAUDRATE;
@@ -138,7 +169,7 @@ bool SerialPort_open(SerialPort self)
 		serialParams.Parity = EVENPARITY;
 	else /* 'O' */
 		serialParams.Parity = ODDPARITY;
-		
+
 	if (SetCommState(self->h, &serialParams) == FALSE) {
 		self->lastError = SERIAL_PORT_ERROR_INVALID_ARGUMENT;
 		goto exit_error;
@@ -158,7 +189,7 @@ bool SerialPort_open(SerialPort self)
 		self->lastError = SERIAL_PORT_ERROR_UNKNOWN;
 		goto exit_error;
 	}
-	
+
 	unidesc ud; ud.u64 = (uint64_t)self->h;
 	int charsSpacing = (int)((8000.0f / (float)self->baudRate) * 5); // 5 symbols
 	charsSpacing += (charsSpacing)? 0 : 1;

@@ -124,7 +124,7 @@ static int do_mkdir(const char *path, mode_t mode)
 
 bool FileSystem_createDirectory(const char *directoryName)
 {
-	mode_t mode = 0007;
+	mode_t mode = 0700;
 	char buf[1024];
 	bool ok = true;
 	char *sp, *pp = buf;
@@ -152,12 +152,12 @@ bool FileSystem_deleteDirectory(const char *directoryName)
     char *p, *fullPath = (char *)calloc(1, 512);
 	sprintf(fullPath, "%s/", directoryName);
 	p = fullPath + strlen(fullPath);
-	
+
 	while ( (f = FileSystem_readDirectory(dh, &isdir)) ) {
 		if ( strcmp(f, ".") == 0 ) continue;
 		if ( strcmp(f, "..") == 0 ) continue;
 		strcpy(p, f);
-		rc = (isdir)? 
+		rc = (isdir)?
 			FileSystem_deleteDirectory(fullPath) : FileSystem_deleteFile(fullPath);
 		if (rc == false) {
 			goto toexit;

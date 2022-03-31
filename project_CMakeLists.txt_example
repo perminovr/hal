@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 project(project0)
 
-# for ethernet supporting
+# for raw ethernet supporting
 set(HAL_PCAP_SUPPORTED ON)
 set(NPCAPLIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/npcap)
 

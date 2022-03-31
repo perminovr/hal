@@ -218,6 +218,10 @@ DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr);
  * Remote address must be assigned via \ref DgramSocket_setRemote for filterring
  * purpose. If the address is not defined when use \ref DgramSocket_readFrom instead.
  *
+ * The function can return 0 even socket has data in case filtered remote partner.
+ *
+ * Performs internal \ref DgramSocket_readAvailable call.
+ *
  * \param self the socket instance
  * \param buf the buffer where the read bytes are copied to
  * \param size the maximum number of bytes to read (size of the provided buffer)
@@ -274,11 +278,15 @@ DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8
  * \brief Get the number of bytes available for reading from the socket
  *
  * \param self the socket instance
+ * \param fromRemote flush all frames except from remote ( \ref DgramSocket_setRemote )
  *
  * \return the number of bytes available for reading or -1 if an error occurred
+ * if fromRemote == true, returns available bytes from 'remote' source (and flushes
+ * frames from other sources)
+ * if fromRemote == false, returns available bytes from any source (without flushing)
  */
 HAL_API int
-DgramSocket_readAvailable(DgramSocket self);
+DgramSocket_readAvailable(DgramSocket self, bool fromRemote);
 
 /**
  * \brief destroy a socket (after close the socket)

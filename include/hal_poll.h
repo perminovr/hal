@@ -120,7 +120,10 @@ HAL_API int
 Hal_poll(Pollfd pfd, unsigned long int size, int timeout);
 
 /**
- * \brief  Poll single file descriptors. Acts like @ref Hal_poll. revents ptr is unnecessary
+ * \brief  Poll single file descriptors. Acts like \ref Hal_poll
+ *
+ * \param revents - can be NULL pointer
+ *
 */
 HAL_API int
 Hal_pollSingle(unidesc fd, int events, int *revents, int timeout);

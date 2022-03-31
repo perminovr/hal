@@ -1,5 +1,4 @@
 
-
 add_executable(test_base tests/test_base.c)
 add_executable(test_time tests/test_time.c)
 add_executable(test_poll tests/test_poll.c)
@@ -7,6 +6,9 @@ add_executable(test_halpoll tests/test_halpoll.c)
 add_executable(test_fs tests/test_fs.c)
 add_executable(test_timer tests/test_timer.c)
 add_executable(test_thread tests/test_thread.c)
+add_executable(test_stream tests/test_stream.c)
+add_executable(test_dgram tests/test_dgram.c)
+add_executable(test_serial tests/test_serial.c)
 
 target_link_libraries(test_base PUBLIC libhal)
 target_link_libraries(test_time PUBLIC libhal)
@@ -15,6 +17,9 @@ target_link_libraries(test_halpoll PUBLIC libhal)
 target_link_libraries(test_fs PUBLIC libhal)
 target_link_libraries(test_timer PUBLIC libhal)
 target_link_libraries(test_thread PUBLIC libhal)
+target_link_libraries(test_stream PUBLIC libhal)
+target_link_libraries(test_dgram PUBLIC libhal)
+target_link_libraries(test_serial PUBLIC libhal)
 
 
 
@@ -27,6 +32,7 @@ add_test(test_base_portrng test_base 6)
 add_test(test_base_porteq test_base 7)
 
 add_test(test_time_time test_time 1)
+add_test(test_time_time test_time 2)
 
 add_test(test_poll_to test_poll 1)
 add_test(test_poll_ev test_poll 2)
@@ -64,3 +70,28 @@ add_test(test_thread_sem2 test_thread 5)
 add_test(test_thread_mu test_thread 6)
 add_test(test_thread_mu2 test_thread 7)
 add_test(test_thread_sig test_thread 8)
+
+add_test(test_stream_tcpbase test_stream 1)
+add_test(test_stream_tacpt2con test_stream 2)
+add_test(test_stream_tclbind test_stream 3)
+add_test(test_stream_tsyncon test_stream 4)
+add_test(test_stream_tcl2con test_stream 5)
+add_test(test_stream_lclbase test_stream 100)
+add_test(test_stream_lacpt2con test_stream 101)
+add_test(test_stream_lcl2con test_stream 102)
+
+add_test(test_dgram_ubase test_dgram 1)
+add_test(test_dgram_ureuse test_dgram 2)
+add_test(test_dgram_urst test_dgram 3)
+add_test(test_dgram_mcast test_dgram 4)
+add_test(test_dgram_udesc test_dgram 5)
+add_test(test_dgram_upfilt test_dgram 6)
+add_test(test_dgram_lbase test_dgram 10)
+add_test(test_dgram_lrst test_dgram 11)
+add_test(test_dgram_ldesc test_dgram 12)
+add_test(test_dgram_lpfilt test_dgram 13)
+
+add_test(test_serial_base test_serial 1)
+add_test(test_serial_disc test_serial 2)
+add_test(test_serial_reinit test_serial 3)
+add_test(test_serial_desc test_serial 4)

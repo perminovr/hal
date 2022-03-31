@@ -224,7 +224,7 @@ bool EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 	ULONG sz = sizeof(u);
 	MIB_IPADDRROW *tt;
 	MIB_IFROW r;
-	
+
 	DWORD idx = if_nametoindex(iface); // 0 if error
 	DWORD waddr = 0;
 	inet_pton(AF_INET, iface, &waddr);
@@ -266,6 +266,7 @@ uint8_t *EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr)
 bool DgramSocket_reset(DgramSocket self)
 {
 	if (self == NULL) return false;
+	if (self->domain != AF_INET) return false;
 	if (self->s != INVALID_SOCKET) {
 		closesocket(self->s);
 		uint16_t protocol = (self->protocol != -1)? (uint16_t)self->protocol : 0;
@@ -298,9 +299,8 @@ void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 	memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));
 }
 
-int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size)
+static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size, int flags)
 {
-	if (self == NULL || addr == NULL || buf == NULL) return -1;
 	struct sockaddr_storage saddr;
 	socklen_t addr_size;
 	memset(&saddr, 0, sizeof(struct sockaddr_storage));
@@ -316,27 +316,35 @@ int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf
 		} break;
 		default: break;
 	}
-	int rc = recvfrom(self->s, buf, size, 0, (struct sockaddr *)&saddr, &addr_size);
+	int rc = recvfrom(self->s, buf, size, flags, (struct sockaddr *)&saddr, &addr_size);
 	if (rc > 0) {
-		switch (self->domain) {
-			case AF_INET: {
-				struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-				inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
-				addr->port = htons(paddr->sin_port);
-			} break;
-			case AF_UNIX: {
-				struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-				inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
-				addr->port = htons(paddr->sin_port);
-			} break;
-			case AF_PACKET: {
-				struct sockaddr_dl *paddr = (struct sockaddr_dl *)&saddr;
-				memcpy(addr->mac, paddr->sdl_data, ETH_ALEN);
-			} break;
-			default: break;
+		if (addr) {
+			switch (self->domain) {
+				case AF_INET: {
+					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
+					inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
+					addr->port = htons(paddr->sin_port);
+				} break;
+				case AF_UNIX: {
+					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
+					inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
+					addr->port = htons(paddr->sin_port);
+				} break;
+				case AF_PACKET: {
+					struct sockaddr_dl *paddr = (struct sockaddr_dl *)&saddr;
+					memcpy(addr->mac, paddr->sdl_data, ETH_ALEN);
+				} break;
+				default: break;
+			}
 		}
 	}
 	return rc;
+}
+
+int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size)
+{
+	if (self == NULL || addr == NULL || buf == NULL) return -1;
+	return socketReadFrom(self, addr, buf, size, 0);
 }
 
 int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size)
@@ -374,30 +382,9 @@ int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const u
 int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
-	union uDgramSocketAddress source;
-	int rc = DgramSocket_readFrom(self, &source, buf, size);
-	if (rc < 0) return rc;
-	if (rc > 0) {
-		switch (self->domain) {
-			case AF_INET: {
-				if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
-					return rc;
-				}
-			} break;
-			case AF_UNIX: {
-				if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
-					return rc;
-				}
-			} break;
-			case AF_PACKET: {
-				if (memcmp(source.mac, self->remote.mac, ETH_ALEN) == 0) {
-					return rc;
-				}
-			} break;
-			default: break;
-		}
-	}
-	return 0;
+	int rc = DgramSocket_readAvailable(self, true);
+	if (rc <= 0) return rc;
+	return socketReadFrom(self, NULL, buf, size, 0);
 }
 
 int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
@@ -406,10 +393,43 @@ int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 	return DgramSocket_writeTo(self, &self->remote, buf, size);
 }
 
-int DgramSocket_readAvailable(DgramSocket self)
+int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 {
 	if (self == NULL) return -1;
-	return getSocketAvailableToRead(self->s);
+
+	uint8_t buf[1];
+	union uDgramSocketAddress source;
+	int ret, rc;
+	while (1) {
+		ret = getSocketAvailableToRead(self->s);
+		if (ret <= 0) return ret;
+		if (!fromRemote) return ret;
+		//
+		rc = socketReadFrom(self, &source, buf, 1, MSG_PEEK);
+		if (rc > 0) {
+			switch (self->domain) {
+				case AF_INET: {
+					if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
+						return ret;
+					}
+				} break;
+				case AF_UNIX: {
+					if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
+						return ret;
+					}
+				} break;
+				case AF_PACKET: {
+					if (memcmp(source.mac, self->remote.mac, ETH_ALEN) == 0) {
+						return ret;
+					}
+				} break;
+				default: break;
+			}
+			socketReadFrom(self, &source, buf, 1, 0); // flush
+		} else {
+			return -1;
+		}
+	}
 }
 
 void DgramSocket_destroy(DgramSocket self)

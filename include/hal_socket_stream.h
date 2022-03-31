@@ -29,9 +29,10 @@ typedef struct sClientSocket *ClientSocket;
 
 /** State of an asynchronous connect */
 typedef enum {
-	SOCKET_STATE_CONNECTING = 0,
-	SOCKET_STATE_FAILED = 1,
-	SOCKET_STATE_CONNECTED = 2,
+	SOCKET_STATE_IDLE = 0,
+	SOCKET_STATE_CONNECTING,
+	SOCKET_STATE_CONNECTED,
+	SOCKET_STATE_FAILED,
 	SOCKET_STATE_ERROR_UNKNOWN = 99
 } ClientSocketState;
 
@@ -189,6 +190,14 @@ ServerSocket_getClientsNumber(ServerSocket self);
  */
 HAL_API ServerClient
 ServerSocket_getClients(ServerSocket self);
+
+/**
+ * \brief Close all static clients soket related this server
+ *
+ * \param self server socket instance
+ */
+HAL_API void
+ServerSocket_closeClients(ServerSocket self);
 
 /**
  * \brief Destroy a server socket instance

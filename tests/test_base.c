@@ -2,9 +2,13 @@
 #include <stdio.h>
 #include "hal_base.h"
 
+#define err() printf("%s:%d\n", __FILE__, __LINE__)
+
 int main(int argc, const char **argv)
 {
-    switch (atoi(argv[1])) {
+	int test = 0;
+	test = atoi(argv[1]);
+    switch (test) {
         case 1: {
             if (Hal_unidescIsInvalid( Hal_getInvalidUnidesc() )) return 0;
         } break;
@@ -32,5 +36,5 @@ int main(int argc, const char **argv)
         } break;
     }
 
-    return 1;
+    { err(); return 1; }
 }
