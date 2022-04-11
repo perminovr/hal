@@ -24,6 +24,15 @@ extern "C" {
  * @{
  */
 
+struct timespechal { uint32_t tv_sec; uint32_t tv_nsec; };
+
+/**
+ * Get the system real time
+ *
+ * \return 0 - ok, !0 - failed
+ */
+HAL_API int
+Hal_getRealTimeSpec(struct timespechal *ts);
 
 /**
  * Get the system time in milliseconds.

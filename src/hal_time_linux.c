@@ -5,6 +5,15 @@
 #include <time.h>
 #include <sys/time.h>
 
+int Hal_getRealTimeSpec(struct timespechal *ts)
+{
+	struct timespec now;
+	int ret = clock_gettime(CLOCK_REALTIME, &now);
+	ts->tv_sec = (uint32_t)now.tv_sec;
+	ts->tv_nsec = (uint32_t)now.tv_nsec;
+	return ret;
+}
+
 uint64_t Hal_getTimeInMs(void)
 {
 	struct timeval now;
