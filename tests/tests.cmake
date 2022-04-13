@@ -53,6 +53,7 @@ add_test(test_halpoll_pout test_halpoll 4)
 add_test(test_halpoll_pinout test_halpoll 5)
 add_test(test_halpoll_rm test_halpoll 6)
 add_test(test_halpoll_upd test_halpoll 7)
+add_test(test_halpoll_rsz test_halpoll 8)
 
 add_test(test_fs_nexst test_fs 1)
 add_test(test_fs_rw test_fs 2)

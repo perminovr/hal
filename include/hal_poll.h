@@ -261,6 +261,17 @@ HAL_API int
 HalPoll_wait(HalPoll self, int timeout);
 
 /**
+ * \brief Resize HalPoll object
+ *
+ * \param maxSize - maximum available size for descriptors in the poll queue
+ * \details Increasing only
+ *
+ * \return true in case of success, false otherwise
+*/
+HAL_API bool
+HalPoll_resize(HalPoll self, int maxSize);
+
+/**
  * \brief Destroy HallPoll instance
  *
  * \param self - a HalPoll instance

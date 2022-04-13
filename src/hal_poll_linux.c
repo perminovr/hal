@@ -44,7 +44,7 @@ int Hal_pollSingle(unidesc fd, int events, int *revents, int timeout)
 
 	ret = poll(&lpfd, 1, timeout);
 	if (revents) *revents = lpfd.revents;
-	
+
 	return ret;
 }
 
@@ -84,6 +84,33 @@ exit_objects:
 exit_self:
 	free(self);
 	return NULL;
+}
+
+
+bool HalPoll_resize(HalPoll self, int maxSize)
+{
+	if (self == NULL) return false;
+	if (self->maxSize >= maxSize) return true;
+
+	EventObject *objects = (EventObject *)calloc(maxSize, sizeof(EventObject));
+	if (!objects) return false;
+	struct pollfd *pfd = (struct pollfd *)calloc(maxSize, sizeof(struct pollfd));
+	if (!pfd) {
+		free(objects);
+		return false;
+	}
+
+	memcpy(objects, self->objects, self->maxSize * sizeof(EventObject));
+	memcpy(pfd, self->pfd, self->maxSize * sizeof(struct pollfd));
+
+	free(self->objects);
+	free(self->pfd);
+
+	self->objects = objects;
+	self->pfd = pfd;
+	self->maxSize = maxSize;
+
+	return true;
 }
 
 

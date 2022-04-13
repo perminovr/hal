@@ -13,7 +13,7 @@ void poll_cb(void *user, void *object, int revents)
 {
     poll_cb_revents = revents;
     if ( user == ((void *)((size_t)1)) && object == ((void *)((size_t)2)) )
-        poll_cb_passed = 1;
+        poll_cb_passed++;
 }
 
 int main(int argc, const char **argv)
@@ -126,6 +126,39 @@ int main(int argc, const char **argv)
             HalPoll_destroy(h);
             return 0;
         } break;
+        case 8: {
+			AccurateTime_t at;
+			uint64_t ts;
+			HalPoll_destroy(h);
+			h = HalPoll_create(1);
+			HalPoll_update(h, Timer_getDescriptor(t), HAL_POLLIN, object, user, poll_cb);
+			//
+			at.sec = 0; at.nsec = 200 * 1000 * 1000;
+			Timer_setTimeout(t, &at);
+			//
+			Timer t2 = Timer_create();
+			at.sec = 0; at.nsec = 100 * 1000 * 1000;
+			Timer_setTimeout(t2, &at);
+			if (!HalPoll_resize(h, 2)) { err(); return 1; }
+			if (!HalPoll_update(h, Timer_getDescriptor(t2), HAL_POLLIN, object, user, poll_cb)) { err(); return 1; }
+			//
+			ts0 = Hal_getTimeInMs();
+			rc = HalPoll_wait(h, 500); // t2
+			ts = Hal_getTimeInMs() - ts0;
+			Timer_endEvent(t2);
+			if (rc <= 0) { err(); return 1; }
+			if (ts > 120 || ts < 80) { err(); return 1; }
+			//
+			ts0 = Hal_getTimeInMs();
+			rc = HalPoll_wait(h, 500); // t
+			ts = Hal_getTimeInMs() - ts0;
+			Timer_endEvent(t);
+			if (rc <= 0) { err(); return 1; }
+			if (ts > 120 || ts < 80) { err(); return 1; }
+			//
+			HalPoll_destroy(h);
+			return 0;
+		} break;
     }
 
     { err(); return 1; }

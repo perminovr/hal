@@ -5,9 +5,9 @@
 #include <winsock2.h>
 
 
-static inline int poll( struct pollfd *pfd, unsigned long int nfds, int timeout) 
+static inline int poll( struct pollfd *pfd, unsigned long int nfds, int timeout)
 {
-	return WSAPoll ( (LPWSAPOLLFD)pfd, (ULONG)nfds, (INT)timeout ); 
+	return WSAPoll ( (LPWSAPOLLFD)pfd, (ULONG)nfds, (INT)timeout );
 }
 
 static inline int events_win_to_hal0(SHORT pollev)
@@ -24,9 +24,9 @@ static inline int events_win_to_hal0(SHORT pollev)
 }
 static int events_win_to_hal(SHORT pollev)
 {
-	const SHORT pollarr[] = { 
-		POLLIN, POLLOUT, POLLPRI, 
-		POLLERR, POLLHUP, POLLNVAL 
+	const SHORT pollarr[] = {
+		POLLIN, POLLOUT, POLLPRI,
+		POLLERR, POLLHUP, POLLNVAL
 	};
 	int ret = 0;
 	for (int i = 0; i < 6; ++i) {
@@ -49,9 +49,9 @@ static inline SHORT events_hal_to_win0(int pollev)
 }
 static SHORT events_hal_to_win(int pollev)
 {
-	const int pollarr[] = { 
-		HAL_POLLIN, HAL_POLLOUT, HAL_POLLPRI, 
-		HAL_POLLERR, HAL_POLLHUP, HAL_POLLNVAL 
+	const int pollarr[] = {
+		HAL_POLLIN, HAL_POLLOUT, HAL_POLLPRI,
+		HAL_POLLERR, HAL_POLLHUP, HAL_POLLNVAL
 	};
 	SHORT ret = 0;
 	for (int i = 0; i < 6; ++i) {
@@ -138,6 +138,33 @@ exit_objects:
 exit_self:
 	free(self);
 	return NULL;
+}
+
+
+bool HalPoll_resize(HalPoll self, int maxSize)
+{
+	if (self == NULL) return false;
+	if (self->maxSize >= maxSize) return true;
+
+	EventObject *objects = (EventObject *)calloc(maxSize, sizeof(EventObject));
+	if (!objects) return false;
+	struct pollfd *pfd = (struct pollfd *)calloc(maxSize, sizeof(struct pollfd));
+	if (!pfd) {
+		free(objects);
+		return false;
+	}
+
+	memcpy(objects, self->objects, self->maxSize * sizeof(EventObject));
+	memcpy(pfd, self->pfd, self->maxSize * sizeof(struct pollfd));
+
+	free(self->objects);
+	free(self->pfd);
+
+	self->objects = objects;
+	self->pfd = pfd;
+	self->maxSize = maxSize;
+
+	return true;
 }
 
 
