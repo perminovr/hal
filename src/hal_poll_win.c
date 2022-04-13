@@ -163,6 +163,7 @@ bool HalPoll_resize(HalPoll self, int maxSize)
 	self->objects = objects;
 	self->pfd = pfd;
 	self->maxSize = maxSize;
+	self->updated = true;
 
 	return true;
 }
