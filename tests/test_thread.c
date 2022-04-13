@@ -9,9 +9,11 @@
 typedef struct {
     Thread self;
     Signal cs;
+    Signal ps;
     int n;
     int res;
     int done;
+    int state;
     Semaphore sem;
     Mutex mu;
 } test_t;
@@ -59,6 +61,15 @@ void *thread_loop(void *arg)
             Mutex_lock(tt.mu);
             Thread_sleep(200);
             Mutex_unlock(tt.mu);
+        } break;
+        case 9: {
+			tt.state = 1;
+			Thread_testPause(tt.self); // should pass through
+			tt.state = 2;
+            rc = Hal_pollSingle(Signal_getDescriptor(tt.ps), HAL_POLLIN, NULL, -1);
+			tt.state = 3;
+			Thread_testPause(tt.self);
+			tt.state = 4;
         } break;
     }
     return NULL;
@@ -199,6 +210,21 @@ int main(int argc, const char **argv)
             if (ts < 80 || ts > 120) { err(); return 1; }
             if (Signal_event(s) != false) { err(); return 1; }
             Signal_destroy(s);
+            return 0;
+        } break;
+        case 9: { // pause
+            tt.self = Thread_create(65535, thread_loop, &tt, true);
+			tt.ps = Thread_getPauseSignal(tt.self);
+            Thread_start(tt.self);
+            Thread_sleep(1);
+            if (tt.state != 2) { err(); return 1; }
+            Thread_pause(tt.self);
+            if (tt.state != 3) { err(); return 1; }
+            Thread_sleep(100);
+            if (tt.state != 3) { err(); return 1; }
+            Thread_resume(tt.self);
+            Thread_sleep(1);
+            if (tt.state != 4) { err(); return 1; }
             return 0;
         } break;
     }

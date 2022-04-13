@@ -73,6 +73,7 @@ add_test(test_thread_sem2 test_thread 5)
 add_test(test_thread_mu test_thread 6)
 add_test(test_thread_mu2 test_thread 7)
 add_test(test_thread_sig test_thread 8)
+add_test(test_thread_pause test_thread 9)
 
 add_test(test_stream_tcpbase test_stream 1)
 add_test(test_stream_tacpt2con test_stream 2)

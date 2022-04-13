@@ -15,6 +15,9 @@ struct sThread {
 	int state;
 	bool autodestroy;
 	Signal cs;
+	Signal ps;
+	Semaphore sem1;
+	Semaphore sem2;
 };
 
 
@@ -80,14 +83,22 @@ void Mutex_destroy(Mutex self)
 }
 
 
+static void Thread_destroyMem(Thread self)
+{
+	Semaphore_destroy(self->sem2);
+	Semaphore_destroy(self->sem1);
+	Signal_destroy(self->ps);
+	Signal_destroy(self->cs);
+	free(self);
+}
+
 static DWORD WINAPI destroyAutomaticThreadRunner(LPVOID parameter)
 {
 	Thread self = (Thread) parameter;
 	self->function(self->parameter);
 	self->state = 0;
 	CloseHandle(self->handle);
-	Signal_destroy(self->cs);
-	free(self);
+	Thread_destroyMem(self);
 	return 0;
 }
 
@@ -104,8 +115,22 @@ Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *p
 
 	self->cs = Signal_create();
 	if (!self->cs) {
-		free(self);
-		return NULL;
+		goto exit_self;
+	}
+
+	self->ps = Signal_create();
+	if (!self->ps) {
+		goto exit_cs;
+	}
+
+	self->sem1 = Semaphore_create(1);
+	if (!self->sem1) {
+		goto exit_ps;
+	}
+
+	self->sem2 = Semaphore_create(1);
+	if (!self->sem2) {
+		goto exit_sem1;
 	}
 
 	self->parameter = parameter;
@@ -119,6 +144,16 @@ Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *p
 	);
 
 	return self;
+
+exit_sem1:
+	Semaphore_destroy(self->sem1);
+exit_ps:
+	Signal_destroy(self->ps);
+exit_cs:
+	Signal_destroy(self->cs);
+exit_self:
+	free(self);
+	return NULL;
 }
 
 void Thread_start(Thread self)
@@ -140,7 +175,7 @@ void Thread_destroy(Thread self)
 	}
 	CloseHandle(self->handle);
 	Signal_destroy(self->cs);
-	free(self);
+	Thread_destroyMem(self);
 }
 
 void Thread_sleep(int millies)
@@ -169,6 +204,32 @@ void Thread_testCancel(Thread self)
 			return;
 		ExitThread(0);
 	}
+}
+
+void Thread_testPause(Thread self)
+{
+	if (Signal_event(self->ps)) {
+		Signal_end(self->ps);
+		Semaphore_post(self->sem2); // unlock pause
+		Semaphore_wait(self->sem1); // waiting for resume
+		Semaphore_post(self->sem1); // free resource
+	}
+}
+
+void Thread_pause(Thread self)
+{
+	if (self == NULL) return;
+	Semaphore_wait(self->sem1);
+	Semaphore_wait(self->sem2);
+	Signal_raise(self->ps);
+	Semaphore_wait(self->sem2); // waiting for thread
+	Semaphore_post(self->sem2); // free resource
+}
+
+void Thread_resume(Thread self)
+{
+	if (self == NULL) return;
+	Semaphore_post(self->sem1);
 }
 
 unidesc Thread_getNativeDescriptor(Thread self)

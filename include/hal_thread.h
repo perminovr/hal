@@ -97,6 +97,9 @@ Thread_destroy(Thread thread);
 HAL_API void
 Thread_sleep(int millies);
 
+/**
+ * \brief Switch executing thread
+ */
 HAL_API void
 Thread_yield(void);
 
@@ -113,20 +116,48 @@ HAL_API void
 Thread_testCancel(Thread thread);
 
 /**
- * \brief Return native system descriptor
- */
-HAL_API unidesc
-Thread_getNativeDescriptor(Thread thread);
-
-/**
  * \brief Get signal that will be raised on \ref Thread_cancel call
  * \details the signal shoud be polled
  */
 HAL_API Signal
 Thread_getCancelSignal(Thread thread);
 
+/**
+ * \brief Send pause signal to the thread
+ */
+HAL_API void
+Thread_pause(Thread thread);
+
+/**
+ * \brief Resume the thread
+ */
+HAL_API void
+Thread_resume(Thread thread);
+
+/**
+ * \brief Check for pause condition on the thread
+ */
+HAL_API void
+Thread_testPause(Thread thread);
+
+/**
+ * \brief Get signal that will be raised on \ref Thread_pause call
+ */
+HAL_API Signal
+Thread_getPauseSignal(Thread thread);
+
+/**
+ * \brief Set thread name
+ */
 HAL_API void
 Thread_setName(Thread thread, const char *name);
+
+/**
+ * \brief Return native system descriptor
+ */
+HAL_API unidesc
+Thread_getNativeDescriptor(Thread thread);
+
 
 HAL_API Semaphore
 Semaphore_create(int initialValue);
