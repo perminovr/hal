@@ -48,6 +48,7 @@ static inline int getSocketAvailableToRead(SOCKET s)
 
 DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 {
+	DgramSocket self;
 	HalShSys_init();
 
 	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -63,7 +64,7 @@ DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 		}
 	}
 
-	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
+	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
 		self->s = sock;
 		self->domain = AF_INET;

@@ -65,6 +65,11 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 
 	struct sockaddr_in serverAddress;
 	Mutex mu = NULL;
+	ServerSocket self;
+	struct linger lin = {
+		.l_onoff = 1,
+		.l_linger = 0
+	};
 
 	if (!prepareSocketAddress(address, port, &serverAddress)) {
 		goto exit_error;
@@ -74,17 +79,13 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 	}
 
 	// disable TIME_WAIT
-	struct linger lin = {
-		.l_onoff = 1,
-		.l_linger = 0
-	};
 	if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) != 0) goto exit_error;
 
 	mu = Mutex_create();
 	if (!mu) {
 		goto exit_error;
 	}
-	ServerSocket self = (ServerSocket)calloc(1, sizeof(struct sServerSocket));
+	self = (ServerSocket)calloc(1, sizeof(struct sServerSocket));
 	if (self) {
 		self->clients.self = (struct sClientSocket *)calloc(maxConnections, sizeof(struct sClientSocket));
 		if (self->clients.self) {
@@ -111,6 +112,12 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 	SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (sock == INVALID_SOCKET) return NULL;
 
+	ClientSocket self;
+	struct linger lin = {
+		.l_onoff = 1,
+		.l_linger = 0
+	};
+
 	if (ip || port) {
 		struct sockaddr_in addr;
 		if (!prepareSocketAddress(ip, port, &addr)) {
@@ -122,13 +129,9 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 	}
 
 	// RST instead FIN
-	struct linger lin = {
-		.l_onoff = 1,
-		.l_linger = 0
-	};
 	if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) != 0) goto exit_error;
 
-	ClientSocket self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
+	self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
 		self->s = sock;
 		self->domain = AF_INET;

@@ -69,6 +69,7 @@ static inline int getSocketAvailableToRead(int fd)
 
 DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 {
+	DgramSocket self;
 	int fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) return NULL;
 
@@ -82,7 +83,7 @@ DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 		}
 	}
 
-	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
+	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_INET;
@@ -154,12 +155,13 @@ DgramSocket LocalDgramSocket_create(const char *address)
 	struct sockaddr_un addr;
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, address);
+	DgramSocket self;
 
 	if (bind(fd, (struct sockaddr*)&addr, sizeof(struct sockaddr_un)) < 0) {
 		goto exit_error;
 	}
 
-	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
+	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_UNIX;
@@ -193,6 +195,7 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 	int idx;
 	int sockopt;
 	struct packet_mreq mreq;
+	DgramSocket self;
 
 	bzero(&mreq, sizeof(struct packet_mreq));
 
@@ -206,7 +209,7 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface, IFNAMSIZ-1) < 0) goto exit_error;
 	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) goto exit_error;
 
-	DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
+	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_PACKET;
