@@ -81,15 +81,12 @@ int main(int argc, const char **argv)
             return 0;
         } break;
         case 2: { // cancel
-            tt.cs = Signal_create();
             tt.self = Thread_create(65535, thread_loop, &tt, false);
-            Thread_setCancelSignal(tt.self, tt.cs);
+            tt.cs = Thread_getCancelSignal(tt.self);
             Thread_start(tt.self);
             Thread_sleep(100);
             Thread_cancel(tt.self);
-            Signal_raise(tt.cs);
             Thread_destroy(tt.self);
-            Signal_destroy(tt.cs);
             if (tt.res) { err(); return 1; }
             return 0;
         } break;

@@ -119,10 +119,11 @@ HAL_API unidesc
 Thread_getNativeDescriptor(Thread thread);
 
 /**
- * \brief Set signal that will be raised on \ref Thread_cancel call
+ * \brief Get signal that will be raised on \ref Thread_cancel call
+ * \details the signal shoud be polled
  */
-HAL_API void
-Thread_setCancelSignal(Thread thread, Signal signal);
+HAL_API Signal
+Thread_getCancelSignal(Thread thread);
 
 HAL_API void
 Thread_setName(Thread thread, const char *name);

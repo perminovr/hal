@@ -14,7 +14,6 @@ struct sThread {
 	DWORD threadId;
 	int state;
 	bool autodestroy;
-	Signal killSignal;
 	Signal cs;
 };
 
@@ -86,7 +85,9 @@ static DWORD WINAPI destroyAutomaticThreadRunner(LPVOID parameter)
 	Thread self = (Thread) parameter;
 	self->function(self->parameter);
 	self->state = 0;
-	Thread_destroy(self);
+	CloseHandle(self->handle);
+	Signal_destroy(self->cs);
+	free(self);
 	return 0;
 }
 
@@ -99,21 +100,23 @@ static DWORD WINAPI threadRunner(LPVOID parameter)
 Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
 {
 	Thread self = (Thread) calloc(1, sizeof(struct sThread));
+	if (!self) return NULL;
 
-	if (self != NULL) {
-		self->cs = Signal_create();
-		if (self->cs) {
-			self->parameter = parameter;
-			self->function = function;
-			self->state = 0;
-			self->autodestroy = autodestroy;
-			self->handle = CreateThread(
-					0, (SIZE_T)stackSize,
-					((autodestroy)? destroyAutomaticThreadRunner : threadRunner),
-					(LPVOID)self, CREATE_SUSPENDED, (LPDWORD)&self->threadId
-			);
-		}
+	self->cs = Signal_create();
+	if (!self->cs) {
+		free(self);
+		return NULL;
 	}
+
+	self->parameter = parameter;
+	self->function = function;
+	self->state = 0;
+	self->autodestroy = autodestroy;
+	self->handle = CreateThread(
+			0, (SIZE_T)stackSize,
+			((autodestroy)? destroyAutomaticThreadRunner : threadRunner),
+			(LPVOID)self, CREATE_SUSPENDED, (LPDWORD)&self->threadId
+	);
 
 	return self;
 }
@@ -128,6 +131,10 @@ void Thread_start(Thread self)
 void Thread_destroy(Thread self)
 {
 	if (self == NULL) return;
+	if (self->autodestroy) {
+		Signal_raise(self->cs);
+		return; // can't do anything else
+	}
 	if (self->state == 1) {
 		WaitForSingleObject(self->handle, INFINITE);
 	}
@@ -150,22 +157,17 @@ void Thread_yield(void)
 void Thread_cancel(Thread self)
 {
 	if (self == NULL) return;
-	if (self->killSignal)
-		Signal_raise(self->killSignal);
-	if (!self->autodestroy)
-		Signal_raise(self->cs);
+	Signal_raise(self->cs);
 }
 
 void Thread_testCancel(Thread self)
 {
 	if (self == NULL) return;
-	if (self->killSignal)
-		Signal_end(self->killSignal);
-	if (!self->autodestroy) {
-		if (Signal_event(self->cs)) {
-			Signal_end(self->cs);
-			ExitThread(0);
-		}
+	if (Signal_event(self->cs)) {
+		Signal_end(self->cs);
+		if (self->autodestroy)
+			return;
+		ExitThread(0);
 	}
 }
 
@@ -176,10 +178,10 @@ unidesc Thread_getNativeDescriptor(Thread self)
 	return ret;
 }
 
-void Thread_setCancelSignal(Thread self, Signal signal)
+Signal Thread_getCancelSignal(Thread self)
 {
-	if (self == NULL) return;
-	self->killSignal = signal;
+	if (self == NULL) return NULL;
+	return self->cs;
 }
 
 void Thread_setName(Thread self, const char *name)
