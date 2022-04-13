@@ -1,6 +1,7 @@
 
 #ifdef __linux__
 
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <semaphore.h>
 #include <sys/eventfd.h>
@@ -200,6 +201,13 @@ Signal Thread_getCancelSignal(Thread self)
 {
 	if (self == NULL) return NULL;
 	return self->cs;
+}
+
+void Thread_setName(Thread self, const char *name)
+{
+	if (self == NULL || name == NULL) return;
+	if (self->pthread)
+		pthread_setname_np(self->pthread, name);
 }
 
 
