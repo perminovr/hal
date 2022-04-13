@@ -156,6 +156,7 @@ int main(int argc, const char **argv)
 			if (rc <= 0) { err(); return 1; }
 			if (ts > 120 || ts < 80) { err(); return 1; }
 			//
+			if ( poll_cb_passed != 2) { err(); return 1; }
 			HalPoll_destroy(h);
 			return 0;
 		} break;
