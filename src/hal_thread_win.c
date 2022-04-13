@@ -244,6 +244,12 @@ Signal Thread_getCancelSignal(Thread self)
 	return self->cs;
 }
 
+Signal Thread_getPauseSignal(Thread self)
+{
+	if (self == NULL) return NULL;
+	return self->ps;
+}
+
 void Thread_setName(Thread self, const char *name)
 {
 	if (self == NULL || name == NULL) return;

@@ -104,6 +104,7 @@ int main(int argc, const char **argv)
         case 3: { // autodestroy
             tt.self = Thread_create(65535, thread_loop, &tt, true);
             Thread_start(tt.self);
+            Thread_setName(tt.self, "test_thread");
             ts0 = Hal_getTimeInMs();
             while (tt.done == 0) { Thread_sleep(1); }
             ts = Hal_getTimeInMs() - ts0;
