@@ -124,6 +124,8 @@ Thread_getNativeDescriptor(Thread thread);
 HAL_API void
 Thread_setCancelSignal(Thread thread, Signal signal);
 
+HAL_API void
+Thread_setName(Thread thread, const char *name);
 
 HAL_API Semaphore
 Semaphore_create(int initialValue);

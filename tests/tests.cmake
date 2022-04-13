@@ -34,6 +34,7 @@ add_test(test_base_porteq test_base 7)
 add_test(test_time_time test_time 1)
 add_test(test_time_time2 test_time 2)
 add_test(test_time_realt test_time 3)
+add_test(test_time_monot test_time 4)
 
 add_test(test_poll_to test_poll 1)
 add_test(test_poll_ev test_poll 2)

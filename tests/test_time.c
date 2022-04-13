@@ -38,6 +38,14 @@ int main(int argc, const char **argv)
             if (ndiff > 20000000U) { err(); return 1; }
 			return 0;
         } break;
+        case 4: {
+            uint64_t ts, ts0;
+            ts0 = Hal_getMonotonicTimeInMs();
+			Thread_sleep(100);
+            ts = Hal_getMonotonicTimeInMs() - ts0;
+            if (ts < 80 || ts > 120) { err(); return 1; }
+			return 0;
+        } break;
     }
 
     { err(); return 1; }

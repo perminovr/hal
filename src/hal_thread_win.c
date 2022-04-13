@@ -108,8 +108,8 @@ Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *p
 			self->state = 0;
 			self->autodestroy = autodestroy;
 			self->handle = CreateThread(
-					0, (SIZE_T)stackSize, 
-					((autodestroy)? destroyAutomaticThreadRunner : threadRunner), 
+					0, (SIZE_T)stackSize,
+					((autodestroy)? destroyAutomaticThreadRunner : threadRunner),
 					(LPVOID)self, CREATE_SUSPENDED, (LPDWORD)&self->threadId
 			);
 		}
@@ -182,6 +182,11 @@ void Thread_setCancelSignal(Thread self, Signal signal)
 	self->killSignal = signal;
 }
 
+void Thread_setName(Thread self, const char *name)
+{
+	if (self == NULL || name == NULL) return;
+	SetThreadDescription(self->handle, (PCWSTR)name);
+}
 
 #define EVENT_DSIZE	1
 

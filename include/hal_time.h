@@ -27,7 +27,7 @@ extern "C" {
 struct timespechal { uint32_t tv_sec; uint32_t tv_nsec; };
 
 /**
- * Get the system real time
+ * Get the system real time in timespec representation
  *
  * \return 0 - ok, !0 - failed
  */
@@ -44,6 +44,14 @@ Hal_getRealTimeSpec(struct timespechal *ts);
  */
 HAL_API uint64_t
 Hal_getTimeInMs(void);
+
+/**
+ * Get the system monotonic time in milliseconds.
+ *
+ * \return the system time with millisecond resolution.
+ */
+HAL_API uint64_t
+Hal_getMonotonicTimeInMs(void);
 
 
 /*! @} */
