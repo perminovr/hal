@@ -174,7 +174,6 @@ void Thread_destroy(Thread self)
 		WaitForSingleObject(self->handle, INFINITE);
 	}
 	CloseHandle(self->handle);
-	Signal_destroy(self->cs);
 	Thread_destroyMem(self);
 }
 
