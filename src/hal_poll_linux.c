@@ -324,6 +324,20 @@ int HalPoll_wait(HalPoll self, int timeout)
 }
 
 
+int HalPoll_size(HalPoll self)
+{
+	if (self == NULL) return 0;
+	return self->size;
+}
+
+
+int HalPoll_maxSize(HalPoll self)
+{
+	if (self == NULL) return 0;
+	return self->maxSize;
+}
+
+
 void HalPoll_destroy(HalPoll self)
 {
 	free(self->pfd);

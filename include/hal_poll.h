@@ -271,6 +271,12 @@ HalPoll_wait(HalPoll self, int timeout);
 HAL_API bool
 HalPoll_resize(HalPoll self, int maxSize);
 
+HAL_API int
+HalPoll_size(HalPoll self);
+
+HAL_API int
+HalPoll_maxSize(HalPoll self);
+
 /**
  * \brief Destroy HallPoll instance
  *
