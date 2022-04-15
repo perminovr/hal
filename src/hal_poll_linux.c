@@ -100,8 +100,8 @@ bool HalPoll_resize(HalPoll self, int maxSize)
 		return false;
 	}
 
-	memcpy(objects, self->objects, self->maxSize * sizeof(EventObject));
-	memcpy(pfd, self->pfd, self->maxSize * sizeof(struct pollfd));
+	memcpy((void *)objects, self->objects, self->maxSize * sizeof(EventObject));
+	memcpy((void *)pfd, self->pfd, self->maxSize * sizeof(struct pollfd));
 
 	free(self->objects);
 	free(self->pfd);
@@ -289,6 +289,21 @@ bool HalPoll_remove(HalPoll self, unidesc fd)
 	}
 	self->updated = true;
 	return true;
+}
+
+
+void HalPoll_clear(HalPoll self)
+{
+	if (self == NULL) return;
+	for (int i = 0; i < self->size; ++i) {
+		setSysPollfd(self, i, Hal_getInvalidUnidesc().i32, 0, 0);
+		self->objects[i].object = NULL;
+		self->objects[i].user = NULL;
+		self->objects[i].handler = NULL;
+		HALDEFCPP(self->objects[i].cpphandler = NULL;)
+	}
+	self->size = 0;
+	self->updated = true;
 }
 
 

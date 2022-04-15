@@ -49,14 +49,14 @@ uint16_t Hal_generatePort(const char *name, uint16_t min, uint16_t max)
     if (diff < 999) return 0;
     int len = (int)strlen(name);
     while (ret < min || ret > max) {
-        uint8_t xor = 0;
+        uint8_t vxor = 0;
         const char *p = name;
         int l = len;
         ret += cnt;
         while (l--) {
-            xor = (*p++) ^ ret;
+            vxor = (*p++) ^ ret;
             ret >>= 8;
-            ret ^= table[xor];
+            ret ^= table[vxor];
         }
         cnt++;
         if (cnt > diff) return 0;

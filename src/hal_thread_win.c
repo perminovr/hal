@@ -262,6 +262,8 @@ struct sSignal {
 	int unused;
 };
 
+// todo rework Signal: remove HalShFdesc, use one localsocket
+
 Signal Signal_create(void)
 {
 	return (Signal)HalShFdesc_create(Hal_getInvalidUnidesc());

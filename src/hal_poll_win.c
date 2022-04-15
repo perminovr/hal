@@ -346,6 +346,21 @@ bool HalPoll_remove(HalPoll self, unidesc fd)
 }
 
 
+void HalPoll_clear(HalPoll self)
+{
+	if (self == NULL) return;
+	for (int i = 0; i < self->size; ++i) {
+		setSysPollfd(self, i, Hal_getInvalidUnidesc().u64, 0, 0, false);
+		self->objects[i].object = NULL;
+		self->objects[i].user = NULL;
+		self->objects[i].handler = NULL;
+		HALDEFCPP(self->objects[i].cpphandler = NULL;)
+	}
+	self->size = 0;
+	self->updated = true;
+}
+
+
 int HalPoll_wait(HalPoll self, int timeout)
 {
 	if (self == NULL) return -1;

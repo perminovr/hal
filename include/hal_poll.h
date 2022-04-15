@@ -250,6 +250,12 @@ HAL_API bool
 HalPoll_remove(HalPoll self, unidesc fd);
 
 /**
+ * \brief Remove all descriptors from poll queue
+*/
+HAL_API void
+HalPoll_clear(HalPoll self);
+
+/**
  * \brief Wait for events on descriptors
  *
  * \param self - a HalPoll instance

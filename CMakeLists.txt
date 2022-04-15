@@ -16,21 +16,21 @@ if(WIN32)
         endif()
         include_directories(${NPCAPLIB_DIR}/Include)
         if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-            target_link_libraries(libhal PUBLIC 
+            target_link_libraries(libhal PUBLIC
                 ${NPCAPLIB_DIR}/Lib/x64/wpcap.lib
                 ${NPCAPLIB_DIR}/Lib/x64/packet.lib
             )
         else()
-            target_link_libraries(libhal PUBLIC 
+            target_link_libraries(libhal PUBLIC
                 ${NPCAPLIB_DIR}/Lib/wpcap.lib
                 ${NPCAPLIB_DIR}/Lib/packet.lib
             )
         endif()
         target_compile_definitions(libhal PRIVATE HAL_PCAP_SUPPORTED)
     endif()
-    target_compile_definitions(libhal PRIVATE 
-        EXPORT_FUNCTIONS_FOR_DLL 
-        _CRT_SECURE_NO_WARNINGS 
+    target_compile_definitions(libhal PRIVATE
+        EXPORT_FUNCTIONS_FOR_DLL
+        _CRT_SECURE_NO_WARNINGS
         _WINSOCK_DEPRECATED_NO_WARNING
     )
 else()

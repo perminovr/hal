@@ -145,6 +145,7 @@ void LocalDgramSocket_unlinkAddress(const char *address)
 }
 
 
+// todo EtherDgramSocket
 DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 {
 	if (iface == NULL) return NULL;
