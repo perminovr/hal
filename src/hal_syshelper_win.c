@@ -151,6 +151,7 @@ static ServerSocket getLocalServer(char *buf)
 	int attempts = 100;
 	while (attempts--) {
 		if (GetTempFileNameA((LPCSTR)"\\.", (LPCSTR)"soc", 0, (LPSTR)buf) == 0) return NULL;
+		LocalServerSocket_unlinkAddress(buf);
 		s = LocalServerSocket_create(1, buf);
 		if (s) {
 			ServerSocket_listen(s, 1);

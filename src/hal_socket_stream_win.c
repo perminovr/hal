@@ -185,8 +185,6 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 {
 	if (address == NULL) return NULL;
 
-	DeleteFileA(address);
-
 	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	ServerSocket self = TcpServerSocket_create(maxConnections, HAL_LOCAL_SOCK_ADDR, port);
 
@@ -195,6 +193,12 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 	}
 
 	return self;
+}
+
+
+void LocalServerSocket_unlinkAddress(const char *address)
+{
+	DeleteFileA(address);
 }
 
 

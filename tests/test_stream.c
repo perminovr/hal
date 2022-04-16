@@ -199,6 +199,7 @@ int main(int argc, const char **argv)
 		} break;
 		case 100: { // local base
 			// link
+			LocalServerSocket_unlinkAddress("/tmp/local-s-test");
 			s = LocalServerSocket_create(1, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
 			c1 = LocalClientSocket_create();
@@ -242,6 +243,7 @@ int main(int argc, const char **argv)
 		} break;
 		case 101: { // accept two con
 			// link
+			LocalServerSocket_unlinkAddress("/tmp/local-s-test");
 			s = LocalServerSocket_create(2, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
 			c1 = LocalClientSocket_create();
@@ -276,6 +278,7 @@ int main(int argc, const char **argv)
 		} break;
 		case 102: { // close second con
 			// link
+			LocalServerSocket_unlinkAddress("/tmp/local-s-test");
 			s = LocalServerSocket_create(1, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
 			c1 = LocalClientSocket_create();

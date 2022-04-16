@@ -2,7 +2,7 @@
 #if defined(_WIN32) || defined(_WIN64)
 
 #include "hal_thread.h"
-#include "hal_syshelper.h"
+#include "hal_socket_dgram.h"
 #include <winsock2.h>
 #include <windows.h>
 
@@ -262,48 +262,59 @@ struct sSignal {
 	int unused;
 };
 
-// todo rework Signal: remove HalShFdesc, use one localsocket
-
 Signal Signal_create(void)
 {
-	return (Signal)HalShFdesc_create(Hal_getInvalidUnidesc());
+	char buf[MAX_PATH];
+	DgramSocket s = NULL;
+	int attempts = 100;
+	while (attempts--) {
+		if (GetTempFileNameA((LPCSTR)"\\.", (LPCSTR)"sig", 0, (LPSTR)buf) == 0) return NULL;
+		LocalDgramSocket_unlinkAddress(buf);
+		s = LocalDgramSocket_create(buf);
+		if (s) {
+			DgramSocket_setRemote(s, (DgramSocketAddress)buf);
+			return (Signal)s;
+		}
+		Thread_sleep(1);
+	}
+	return NULL;
 }
 
 void Signal_raise(Signal self)
 {
 	if (self == NULL) return;
-	HalShFdesc fd = (HalShFdesc)self;
+	DgramSocket s = (DgramSocket)self;
 	uint8_t buf[1];
-	ClientSocket_write(fd->i, buf, EVENT_DSIZE);
+	DgramSocket_write(s, buf, EVENT_DSIZE);
 }
 
 void Signal_end(Signal self)
 {
 	if (self == NULL) return;
-	HalShFdesc fd = (HalShFdesc)self;
+	DgramSocket s = (DgramSocket)self;
 	uint8_t buf[1];
-	while (ClientSocket_read(fd->e, buf, EVENT_DSIZE));
+	while (DgramSocket_read(s, buf, EVENT_DSIZE));
 }
 
 bool Signal_event(Signal self)
 {
 	if (self == NULL) return false;
-	HalShFdesc fd = (HalShFdesc)self;
-	return (ClientSocket_readAvailable(fd->e) > 0);
+	DgramSocket s = (DgramSocket)self;
+	return (DgramSocket_readAvailable(s, true) > 0);
 }
 
 void Signal_destroy(Signal self)
 {
 	if (self == NULL) return;
-	HalShFdesc fd = (HalShFdesc)self;
-	HalShFdesc_destroy(fd);
+	DgramSocket s = (DgramSocket)self;
+	DgramSocket_destroy(s);
 }
 
 unidesc Signal_getDescriptor(Signal self)
 {
 	if (self) {
-		HalShFdesc fd = (HalShFdesc)self;
-		return HalShFdesc_getDescriptor(fd);
+		DgramSocket s = (DgramSocket)self;
+		return DgramSocket_getDescriptor(s);
 	}
 	return Hal_getInvalidUnidesc();
 }

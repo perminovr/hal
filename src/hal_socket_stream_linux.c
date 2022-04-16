@@ -217,8 +217,6 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (fd < 0) return NULL;
 
-	unlink(address);
-
 	struct sockaddr_un addr;
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, address);
@@ -251,6 +249,12 @@ exit_error:
 	Mutex_destroy(mu);
 	close(fd);
 	return NULL;
+}
+
+
+void LocalServerSocket_unlinkAddress(const char *address)
+{
+	unlink(address);
 }
 
 
