@@ -135,6 +135,7 @@ int main(int argc, const char **argv)
 			return 0;
 		} break;
 		case 4: { // udp mcast
+			printf("test only works if all network adapters are disabled due to loopback (windows10+)\n");
 			s1 = UdpDgramSocket_createAndBind("127.0.0.1", 43555);
 			s2 = UdpDgramSocket_createAndBind(NULL, 43556);
 			strcpy(addr.ip, "239.255.255.251");
