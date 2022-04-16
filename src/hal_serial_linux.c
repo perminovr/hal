@@ -97,13 +97,13 @@ bool SerialPort_open(SerialPort self)
 
 	tcgetattr(self->fd, &tios);
 
-    tios.c_lflag = 0;
-    tios.c_iflag = 0;
-    tios.c_oflag = 0;
-    tios.c_cc[VMIN] = 0;
-    tios.c_cc[VTIME] = 0;
+	tios.c_lflag = 0;
+	tios.c_iflag = 0;
+	tios.c_oflag = 0;
+	tios.c_cc[VMIN] = 0;
+	tios.c_cc[VTIME] = 0;
 
-    tios.c_cflag = (CREAD | CLOCAL);
+	tios.c_cflag = (CREAD | CLOCAL);
 
 	switch (self->baudRate) {
 		#ifdef B110
@@ -179,15 +179,15 @@ bool SerialPort_open(SerialPort self)
 			baudrate = B9600;
 			self->lastError = SERIAL_PORT_ERROR_INVALID_BAUDRATE;
 			break;
-    }
+	}
 
 	/* Set baud rate */
 	if ((cfsetispeed(&tios, baudrate) < 0) || (cfsetospeed(&tios, baudrate) < 0)) {
 		self->lastError = SERIAL_PORT_ERROR_INVALID_BAUDRATE;
 		goto exit_error;
-    }
+	}
 
-    /* Set data bits (5/6/7/8) */
+	/* Set data bits (5/6/7/8) */
 	switch (self->dataBits) {
 	case 5: tios.c_cflag |= CS5; break;
 	case 6: tios.c_cflag |= CS6; break;
@@ -196,23 +196,23 @@ bool SerialPort_open(SerialPort self)
 	}
 
 	/* Set stop bits (1/2) */
-    if (self->stopBits != 1) {
+	if (self->stopBits != 1) {
 		tios.c_cflag |= CSTOPB;
-    }
+	}
 
-    if (self->parity != 'N') {
-        tios.c_iflag |= INPCK;
-        if (self->parity == 'E') {
-            tios.c_cflag |= PARENB;
-            tios.c_cflag &=~ PARODD;
-        } else { /* 'O' */
-            tios.c_cflag |= PARENB;
-            tios.c_cflag |= PARODD;
-        }
-    }
+	if (self->parity != 'N') {
+		tios.c_iflag |= INPCK;
+		if (self->parity == 'E') {
+			tios.c_cflag |= PARENB;
+			tios.c_cflag &=~ PARODD;
+		} else { /* 'O' */
+			tios.c_cflag |= PARENB;
+			tios.c_cflag |= PARODD;
+		}
+	}
 
 	tios.c_iflag |= IGNBRK; /* Set ignore break to allow 0xff characters */
-    tios.c_iflag |= IGNPAR;
+	tios.c_iflag |= IGNPAR;
 
 	if (tcsetattr(self->fd, TCSANOW, &tios) < 0) {
 		self->lastError = SERIAL_PORT_ERROR_INVALID_ARGUMENT;
@@ -247,13 +247,13 @@ static int SerialPort_readByteTimeout(SerialPort self, struct timeval *timeout)
 
 	int ret = select(self->fd+1, &set, NULL, NULL, timeout);
 
-    if (ret == -1) {
+	if (ret == -1) {
 		self->lastError = SERIAL_PORT_ERROR_UNKNOWN;
 		return -1;
-    } else if (ret == 0) {
+	} else if (ret == 0) {
 		return -1;
 	} else {
-        rc = read(self->fd, (char*) buf, 1);
+		rc = read(self->fd, (char*) buf, 1);
 		if (rc > 0) return (int) buf[0];
 		return -1;
 	}

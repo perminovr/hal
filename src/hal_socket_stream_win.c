@@ -46,7 +46,7 @@ static inline void setSocketNonBlocking(SOCKET s)
 
 static inline int getSocketAvailableToRead(SOCKET s)
 {
-    u_long val = 0;
+	u_long val = 0;
 	if (ioctlsocket(s, FIONREAD, &val) == 0) {
 		return (int)val;
 	}

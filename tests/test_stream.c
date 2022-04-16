@@ -17,8 +17,8 @@ int main(int argc, const char **argv)
 	ClientSocket cs1, cs2;
 	union uClientSocketAddress addr;
 
-    switch (test) {
-        case 1: { // tcp base
+	switch (test) {
+		case 1: { // tcp base
 			// link
 			s = TcpServerSocket_create(1, "127.0.0.1", 43555);
 			ServerSocket_listen(s, 1);
@@ -68,16 +68,16 @@ int main(int argc, const char **argv)
 			if (rc != 10) { err(); return 1; }
 			rc = ClientSocket_read(cs1, buf+1110, 1);
 			if (rc != 1) { err(); return 1; }
-            for (int i = 0; i < 1111; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1111; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// clean
 			ClientSocket_destroy(c1);
 			ClientSocket_destroy(cs1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-        case 2: { // accept two con
+		} break;
+		case 2: { // accept two con
 			// link
 			s = TcpServerSocket_create(2, "127.0.0.1", 43555);
 			ServerSocket_listen(s, 1);
@@ -111,8 +111,8 @@ int main(int argc, const char **argv)
 			ClientSocket_destroy(c1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-        case 3: { // clients bind
+		} break;
+		case 3: { // clients bind
 			// link
 			s = TcpServerSocket_create(2, "127.0.0.1", 43555);
 			ServerSocket_listen(s, 1);
@@ -150,7 +150,7 @@ int main(int argc, const char **argv)
 			ClientSocket_destroy(c1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
+		} break;
 		case 4: { // sync con
 			// prep
 			c1 = TcpClientSocket_create();
@@ -196,8 +196,8 @@ int main(int argc, const char **argv)
 			ClientSocket_destroy(c1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-        case 100: { // local base
+		} break;
+		case 100: { // local base
 			// link
 			s = LocalServerSocket_create(1, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
@@ -231,16 +231,16 @@ int main(int argc, const char **argv)
 			if (rc != 10) { err(); return 1; }
 			rc = ClientSocket_read(cs1, buf+1110, 1);
 			if (rc != 1) { err(); return 1; }
-            for (int i = 0; i < 1111; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1111; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// clean
 			ClientSocket_destroy(c1);
 			ClientSocket_destroy(cs1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-        case 101: { // accept two con
+		} break;
+		case 101: { // accept two con
 			// link
 			s = LocalServerSocket_create(2, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
@@ -273,8 +273,8 @@ int main(int argc, const char **argv)
 			ClientSocket_destroy(c1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-        case 102: { // close second con
+		} break;
+		case 102: { // close second con
 			// link
 			s = LocalServerSocket_create(1, "/tmp/local-s-test");
 			ServerSocket_listen(s, 1);
@@ -305,8 +305,8 @@ int main(int argc, const char **argv)
 			ClientSocket_destroy(c1);
 			ServerSocket_destroy(s);
 			return 0;
-        } break;
-    }
+		} break;
+	}
 
-    { err(); return 1; }
+	{ err(); return 1; }
 }

@@ -149,7 +149,7 @@ bool FileSystem_deleteDirectory(const char *directoryName)
 	bool rc = false;
 	const char *f;
 	bool isdir;
-    char *p, *fullPath = (char *)calloc(1, 512);
+	char *p, *fullPath = (char *)calloc(1, 512);
 	sprintf(fullPath, "%s/", directoryName);
 	p = fullPath + strlen(fullPath);
 

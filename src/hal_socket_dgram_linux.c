@@ -59,7 +59,7 @@ static inline void setSocketNonBlocking(int fd)
 
 static inline int getSocketAvailableToRead(int fd)
 {
-    int val = 0;
+	int val = 0;
 	if (ioctl(fd, FIONREAD, &val) == 0) {
 		return val;
 	}

@@ -151,7 +151,7 @@ bool SerialPort_open(SerialPort self)
 			baudrate = CBR_9600;
 			self->lastError = SERIAL_PORT_ERROR_INVALID_BAUDRATE;
 			break;
-    }
+	}
 	serialParams.BaudRate = baudrate;
 
 	/* Set data bits (5/6/7/8) */
@@ -227,13 +227,13 @@ static int SerialPort_readByteTimeout(SerialPort self, SOCKET s, struct timeval 
 
 	int ret = select(0, &set, NULL, NULL, timeout);
 
-    if (ret == -1) {
+	if (ret == -1) {
 		self->lastError = SERIAL_PORT_ERROR_UNKNOWN;
 		return -1;
-    } else if (ret == 0) {
+	} else if (ret == 0) {
 		return -1;
 	} else {
-        rc = HalShFdescHelper_read(self->fdh, buf, 1);
+		rc = HalShFdescHelper_read(self->fdh, buf, 1);
 		if (rc > 0) return (int)buf[0];
 		return -1;
 	}
