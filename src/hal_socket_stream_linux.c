@@ -535,7 +535,7 @@ int ClientSocket_read(ClientSocket self, uint8_t *buf, int size)
 	if (self->fd == -1)
 		return -1;
 
-	int read_bytes = recv(self->fd, buf, size, MSG_DONTWAIT); // todo
+	int read_bytes = recv(self->fd, buf, size, MSG_DONTWAIT);
 
 	if (read_bytes == 0)
 		return 0;
@@ -559,7 +559,7 @@ int ClientSocket_write(ClientSocket self, const uint8_t *buf, int size)
 		return -1;
 
 	/* MSG_NOSIGNAL - prevent send to signal SIGPIPE when peer unexpectedly closed the socket */
-	int retVal = send(self->fd, buf, size, MSG_NOSIGNAL); // todo
+	int retVal = send(self->fd, buf, size, MSG_NOSIGNAL);
 
 	if (retVal <= 0) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
