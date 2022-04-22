@@ -87,6 +87,7 @@ FileHandle FileSystem_createFileIn(const char *path, char *filename, char *fullp
 	if (fd >= 0) {
 		char buf[512];
 		close(fd);
+		FileSystem_deleteFile(fn);
 		sprintf(buf, "%s/%s", path, fn);
 		if (filename) { strcpy(filename, fn); }
 		if (fullpath) { strcpy(fullpath, buf); }
