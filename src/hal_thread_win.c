@@ -218,6 +218,7 @@ void Thread_testPause(Thread self)
 void Thread_pause(Thread self)
 {
 	if (self == NULL) return;
+	// todo
 	Semaphore_wait(self->sem1);
 	Semaphore_wait(self->sem2);
 	Signal_raise(self->ps);
