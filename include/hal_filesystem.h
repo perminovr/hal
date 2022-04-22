@@ -27,14 +27,25 @@ typedef void *DirectoryHandle;
 /**
  * \brief open a file
  *
- * \param pathName full name (path + filename) of the file
+ * \param filename full name (path + filename) of the file
  * \param readWrite true opens the file with read and write+ access - false opens for read access only
  *
- * \return a handle for the file. Has to be used by subsequent calls to file functions to identify the file or
- *		 NULL if opening fails
+ * \return a handle for the file
  */
 HAL_API FileHandle
-FileSystem_openFile(const char *pathName, bool readWrite);
+FileSystem_openFile(const char *filename, bool readWrite);
+
+/**
+ * \brief create the file with random name in the directory and open it with read and write+ access
+ *
+ * \param path file directory
+ * \param filename storage for new file name (maximum 11 bytes). may be NULL
+ * \param fullpath full name (path + filename) of the file. may be NULL
+ *
+ * \return a handle for the file
+ */
+HAL_API FileHandle
+FileSystem_createFileIn(const char *path, char *filename, char *fullpath);
 
 /**
  * \brief read from an open file
@@ -96,7 +107,7 @@ FileSystem_closeFile(FileHandle handle);
  * The size of the file has to be returned in bytes. The timestamp of the last modification has
  * to be returned as milliseconds since Unix epoch - or 0 if this function is not supported.
  *
- * \param pathName full name (path + filename) of the file
+ * \param filename full name (path + filename) of the file
  * \param fileSize a pointer where to store the file size
  * \param lastModificationTimestamp is used to store the timestamp of last modification of the file
  *
@@ -108,7 +119,7 @@ FileSystem_getFileInfo(const char *filename, uint32_t *fileSize, uint64_t *lastM
 /**
  * \brief delete a file
  *
- * \param pathName full name (path + filename) of the file
+ * \param filename full name (path + filename) of the file
  *
  * \return true on success, false on error
  */
@@ -125,6 +136,33 @@ FileSystem_deleteFile(const char *filename);
  */
 HAL_API bool
 FileSystem_renameFile(const char *oldFilename, const char *newFilename);
+
+/**
+ * \brief copy a file
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+FileSystem_copyFile(const char *filename, const char *newFilename);
+
+/**
+ * \brief copy a file with opened hadlers
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+FileSystem_copyFileH(FileHandle fhs, FileHandle fhd);
+
+/**
+ * \brief copy a file
+ *
+ * \param filename full name (path + filename) of the file
+ * \param hash storage for md5 sum
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+FileSystem_getFileMd5Hash(const char *filename, uint8_t *hash);
 
 /**
  * \brief open the directoy with the specified name
@@ -177,7 +215,7 @@ FileSystem_createDirectory(const char *directoryName);
  *
  * \return true on success, false on error
  */
-HAL_API bool 
+HAL_API bool
 FileSystem_deleteDirectory(const char *directoryName);
 
 /**
@@ -188,7 +226,7 @@ FileSystem_deleteDirectory(const char *directoryName);
  *
  * \return true on success, false on error
  */
-HAL_API bool 
+HAL_API bool
 FileSystem_moveDirectory(const char *dirName, const char *newDirName);
 
 /*! @} */
