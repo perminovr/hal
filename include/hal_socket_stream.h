@@ -139,6 +139,14 @@ HAL_API ServerSocket
 LocalServerSocket_create(int maxConnections, const char *address);
 
 /**
+ * \brief Unlink old local socket
+ *
+ * \param address the address of the local socket
+ */
+HAL_API void
+LocalServerSocket_unlinkAddress(const char *address);
+
+/**
  * \brief Create a local client socket
  *
  * \return a new client socket instance.

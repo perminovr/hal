@@ -46,7 +46,7 @@ static inline void setSocketNonBlocking(SOCKET s)
 
 static inline int getSocketAvailableToRead(SOCKET s)
 {
-    u_long val = 0;
+	u_long val = 0;
 	if (ioctlsocket(s, FIONREAD, &val) == 0) {
 		return (int)val;
 	}
@@ -185,8 +185,6 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 {
 	if (address == NULL) return NULL;
 
-	DeleteFileA(address);
-
 	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	ServerSocket self = TcpServerSocket_create(maxConnections, HAL_LOCAL_SOCK_ADDR, port);
 
@@ -195,6 +193,12 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 	}
 
 	return self;
+}
+
+
+void LocalServerSocket_unlinkAddress(const char *address)
+{
+	DeleteFileA(address);
 }
 
 
@@ -373,20 +377,17 @@ bool ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress addr
 		case AF_INET: {
 			if (!prepareSocketAddress(address->ip, address->port, &serverAddress))
 				return false;
-			if (connect(self->s, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0) {
-				if (errno != EINPROGRESS) {
-					return false;
-				}
-			}
 		} break;
 		case AF_UNIX: {
 			uint16_t port = Hal_generatePort(address->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 			if (!prepareSocketAddress(HAL_LOCAL_SOCK_ADDR, port, &serverAddress))
 				return false;
-			if (connect(self->s, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
-				return false;
-			}
 		} break;
+	}
+	if (connect(self->s, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
+		if (WSAGetLastError() != WSAEWOULDBLOCK) {
+			return false;
+		}
 	}
 
 	self->inreset = false;
@@ -412,7 +413,7 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	if (select(0, NULL, &fdSet , NULL, &timeout) == 1) {
 		int so_error;
 		socklen_t len = sizeof so_error;
-		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) != 0) {
+		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) == 0) {
 			if (so_error == 0) {
 				return true;
 			}
@@ -464,7 +465,7 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 		/* Check if connection is established */
 		int so_error;
 		socklen_t len = sizeof(so_error);
-		if (getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) != 0) {
+		if ( getsockopt(self->s, SOL_SOCKET, SO_ERROR, (char *)&so_error, &len) == 0) {
 			if (so_error == 0)
 				return (self->inreset)? SOCKET_STATE_IDLE : SOCKET_STATE_CONNECTED;
 		}
@@ -483,7 +484,7 @@ int ClientSocket_read(ClientSocket self, uint8_t *buf, int size)
 	if (self->s == INVALID_SOCKET)
 		return -1;
 
-	int read_bytes = recv(self->s, (char *)buf, size, 0); // todo
+	int read_bytes = recv(self->s, (char *)buf, size, 0);
 
 	if (read_bytes == 0)
 		return 0;
@@ -506,7 +507,7 @@ int ClientSocket_write(ClientSocket self, const uint8_t *buf, int size)
 	if (self->s == INVALID_SOCKET)
 		return -1;
 
-	int retVal = send(self->s, (const char *)buf, size, 0); // todo
+	int retVal = send(self->s, (const char *)buf, size, 0);
 
 	if (retVal <= 0) {
 		int error = WSAGetLastError();

@@ -37,8 +37,8 @@ int main(int argc, const char **argv)
 	#if defined(__linux__)
 	const char *iface = "lo";
 	#endif
-    switch (test) {
-        case 1: { // udp base
+	switch (test) {
+		case 1: { // udp base
 			// link
 			s1 = UdpDgramSocket_createAndBind("127.0.0.1", 43555);
 			s2 = UdpDgramSocket_create();
@@ -73,14 +73,14 @@ int main(int argc, const char **argv)
 			if (rc != 5000) { err(); return 1; }
 			if ( strcmp(addr.ip, "127.0.0.1") != 0 ) { err(); return 1; }
 			if (addr.port != 43555) { err(); return 1; }
-            for (int i = 0; i < 65000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 65000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
 			return 0;
-        } break;
+		} break;
 		case 2: { // udp reuse
 			s1 = UdpDgramSocket_create();
 			UdpDgramSocket_setReuse(s1, true);
@@ -111,9 +111,9 @@ int main(int argc, const char **argv)
 			memset(buf, 0, 65535);
 			rc = DgramSocket_read(s2, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
-            for (int i = 0; i < 60000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 60000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// reset
 			DgramSocket_reset(s1);
 			// wr/rd 2
@@ -126,15 +126,16 @@ int main(int argc, const char **argv)
 			memset(buf, 0, 65535);
 			rc = DgramSocket_read(s2, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
-            for (int i = 0; i < 60000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 60000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
 			return 0;
 		} break;
 		case 4: { // udp mcast
+			printf("test only works if all network adapters are disabled due to loopback (windows10+)\n");
 			s1 = UdpDgramSocket_createAndBind("127.0.0.1", 43555);
 			s2 = UdpDgramSocket_createAndBind(NULL, 43556);
 			strcpy(addr.ip, "239.255.255.251");
@@ -171,7 +172,7 @@ int main(int argc, const char **argv)
 			rc = Hal_pollSingle(DgramSocket_getDescriptor(s2), HAL_POLLIN, &revents, 100);
 			ts = Hal_getTimeInMs() - ts0;
 			if (rc != 0) { err(); return 1; }
-            if (ts < 80 || ts > 120) { err(); return 1; }
+			if (ts < 80 || ts > 120) { err(); return 1; }
 			// write
 			rc = DgramSocket_write(s1, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
@@ -180,7 +181,7 @@ int main(int argc, const char **argv)
 			rc = Hal_pollSingle(DgramSocket_getDescriptor(s2), HAL_POLLIN, &revents, 100);
 			ts = Hal_getTimeInMs() - ts0;
 			if (rc <= 0) { err(); return 1; }
-            if (ts > 20) { err(); return 1; }
+			if (ts > 20) { err(); return 1; }
 			// read
 			rc = DgramSocket_read(s2, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
@@ -191,7 +192,7 @@ int main(int argc, const char **argv)
 			if (rc <= 0) { err(); return 1; }
 			if ( (revents&HAL_POLLIN) != 0) { err(); return 1; }
 			if ( (revents&HAL_POLLOUT) == 0) { err(); return 1; }
-            if (ts > 20) { err(); return 1; }
+			if (ts > 20) { err(); return 1; }
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
@@ -224,9 +225,9 @@ int main(int argc, const char **argv)
 			if (rc != 0) { err(); return 1; }
 			rc = DgramSocket_read(s2, buf, 1000);
 			if (rc != 0) { err(); return 1; }
-            for (int i = 0; i < 1000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// write 2
 			for (int i = 0; i < 65535; ++i) {
 				buf[i] = (char)i;
@@ -241,9 +242,9 @@ int main(int argc, const char **argv)
 			if (rc != 1000) { err(); return 1; }
 			rc = DgramSocket_read(s2, buf, 1000);
 			if (rc != 1000) { err(); return 1; }
-            for (int i = 0; i < 1000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// write 3
 			for (int i = 0; i < 65535; ++i) {
 				buf[i] = (char)i;
@@ -294,9 +295,9 @@ int main(int argc, const char **argv)
 			rc = DgramSocket_readFrom(s2, &addr, buf+60000, 5001);
 			if (rc != 5000) { err(); return 1; }
 			if (strlen(addr.address) == 0) { err(); return 1; }
-            for (int i = 0; i < 65000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 65000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
@@ -328,7 +329,7 @@ int main(int argc, const char **argv)
 			rc = Hal_pollSingle(DgramSocket_getDescriptor(s2), HAL_POLLIN, &revents, 100);
 			ts = Hal_getTimeInMs() - ts0;
 			if (rc != 0) { err(); return 1; }
-            if (ts < 80 || ts > 120) { err(); return 1; }
+			if (ts < 80 || ts > 120) { err(); return 1; }
 			// write
 			rc = DgramSocket_write(s1, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
@@ -337,7 +338,7 @@ int main(int argc, const char **argv)
 			rc = Hal_pollSingle(DgramSocket_getDescriptor(s2), HAL_POLLIN, &revents, 100);
 			ts = Hal_getTimeInMs() - ts0;
 			if (rc <= 0) { err(); return 1; }
-            if (ts > 20) { err(); return 1; }
+			if (ts > 20) { err(); return 1; }
 			// read
 			rc = DgramSocket_read(s2, buf, 60000);
 			if (rc != 60000) { err(); return 1; }
@@ -348,7 +349,7 @@ int main(int argc, const char **argv)
 			if (rc <= 0) { err(); return 1; }
 			if ( (revents&HAL_POLLIN) != 0) { err(); return 1; }
 			if ( (revents&HAL_POLLOUT) == 0) { err(); return 1; }
-            if (ts > 20) { err(); return 1; }
+			if (ts > 20) { err(); return 1; }
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
@@ -383,9 +384,9 @@ int main(int argc, const char **argv)
 			if (rc != 0) { err(); return 1; }
 			rc = DgramSocket_read(s2, buf, 1000);
 			if (rc != 0) { err(); return 1; }
-            for (int i = 0; i < 1000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// write 2
 			for (int i = 0; i < 65535; ++i) {
 				buf[i] = (char)i;
@@ -400,9 +401,9 @@ int main(int argc, const char **argv)
 			if (rc != 1000) { err(); return 1; }
 			rc = DgramSocket_read(s2, buf, 1000);
 			if (rc != 1000) { err(); return 1; }
-            for (int i = 0; i < 1000; ++i) {
-                if (buf[i] != (char)i) { err(); return 1; }
-            }
+			for (int i = 0; i < 1000; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
 			// write 3
 			for (int i = 0; i < 65535; ++i) {
 				buf[i] = (char)i;
@@ -446,7 +447,7 @@ int main(int argc, const char **argv)
 		// EtherDgramSocket_getHeader
 		// EtherDgramSocket_getInterfaceMACAddress
 		// EtherDgramSocket_getSocketMACAddress
-    }
+	}
 
-    { err(); return 1; }
+	{ err(); return 1; }
 }

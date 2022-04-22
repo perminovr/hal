@@ -7,12 +7,12 @@
 
 typedef struct sHalShFdesc *HalShFdesc;
 struct sHalShFdesc {
-    unidesc h; // system object
-    struct { // helper socks
-        ServerSocket s;
-        ClientSocket i; // internal
-        ClientSocket e; // external
-    };
+	unidesc h; // system object
+	struct { // helper socks
+		ServerSocket s;
+		ClientSocket i; // internal
+		ClientSocket e; // external
+	};
 };
 
 void HalShSys_init(void);

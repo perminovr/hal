@@ -9,19 +9,19 @@ int main(int argc, const char **argv)
 {
 	int test = 0;
 	test = atoi(argv[1]);
-    switch (test) {
-        case 1: {
-            if (Hal_getTimeInMs() != 0) return 0;
-        } break;
-        case 2: {
-            uint64_t ts, ts0;
-            ts0 = Hal_getTimeInMs();
+	switch (test) {
+		case 1: {
+			if (Hal_getTimeInMs() != 0) return 0;
+		} break;
+		case 2: {
+			uint64_t ts, ts0;
+			ts0 = Hal_getTimeInMs();
 			Thread_sleep(100);
-            ts = Hal_getTimeInMs() - ts0;
-            if (ts < 80 || ts > 120) { err(); return 1; }
+			ts = Hal_getTimeInMs() - ts0;
+			if (ts < 80 || ts > 120) { err(); return 1; }
 			return 0;
-        } break;
-        case 3: {
+		} break;
+		case 3: {
 			struct timespechal tspec0;
 			struct timespechal tspec;
 			while (1) { // simplifying the test
@@ -34,19 +34,19 @@ int main(int argc, const char **argv)
 			Hal_getRealTimeSpec(&tspec);
 			uint32_t ndiff = (tspec.tv_nsec > tspec0.tv_nsec)?
 					tspec.tv_nsec - tspec0.tv_nsec : tspec0.tv_nsec - tspec.tv_nsec;
-            if ((tspec.tv_sec - tspec0.tv_sec) != 1) { err(); return 1; }
-            if (ndiff > 20000000U) { err(); return 1; }
+			if ((tspec.tv_sec - tspec0.tv_sec) != 1) { err(); return 1; }
+			if (ndiff > 20000000U) { err(); return 1; }
 			return 0;
-        } break;
-        case 4: {
-            uint64_t ts, ts0;
-            ts0 = Hal_getMonotonicTimeInMs();
+		} break;
+		case 4: {
+			uint64_t ts, ts0;
+			ts0 = Hal_getMonotonicTimeInMs();
 			Thread_sleep(100);
-            ts = Hal_getMonotonicTimeInMs() - ts0;
-            if (ts < 80 || ts > 120) { err(); return 1; }
+			ts = Hal_getMonotonicTimeInMs() - ts0;
+			if (ts < 80 || ts > 120) { err(); return 1; }
 			return 0;
-        } break;
-    }
+		} break;
+	}
 
-    { err(); return 1; }
+	{ err(); return 1; }
 }

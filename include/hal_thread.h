@@ -217,8 +217,6 @@ Signal_destroy(Signal self);
 HAL_API unidesc
 Signal_getDescriptor(Signal self);
 
-#define Signal_getNativeDescriptor Signal_getDescriptor // todo
-
 
 /*! @} */
 

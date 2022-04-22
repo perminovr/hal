@@ -12,9 +12,9 @@
 #include "hal_filesystem.h"
 
 struct DirectoryHandle_s {
-    HANDLE h;
-    WIN32_FIND_DATA ffd;
-    bool fl;
+	HANDLE h;
+	WIN32_FIND_DATA ffd;
+	bool fl;
 };
 
 
@@ -83,7 +83,7 @@ bool FileSystem_getFileInfo(const char *filename, uint32_t *fileSize, uint64_t *
 DirectoryHandle FileSystem_openDirectory(const char *directoryName)
 {
 	WIN32_FIND_DATA ffd;
-    char fullPath[MAX_PATH + 1];
+	char fullPath[MAX_PATH + 1];
 	struct DirectoryHandle_s *h = NULL;
 	HANDLE dir;
 	if (directoryName == NULL) return NULL;
@@ -176,7 +176,7 @@ bool FileSystem_deleteDirectory(const char *directoryName)
 	bool rc = false;
 	const char *f;
 	bool isdir;
-    char *p, *fullPath = (char *)calloc(1, 512);
+	char *p, *fullPath = (char *)calloc(1, 512);
 	sprintf(fullPath, "%s\\", directoryName);
 	p = fullPath + strlen(fullPath);
 	
