@@ -1,7 +1,9 @@
 #ifndef HAL_TIME_H
 #define HAL_TIME_H
 
+
 #include "hal_base.h"
+
 
 #ifdef __cplusplus
 extern "C" {

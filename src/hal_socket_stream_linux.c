@@ -7,6 +7,7 @@
 
 #include "hal_socket_stream.h"
 #include "hal_thread.h"
+#include "hal_utils.h"
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
@@ -296,9 +297,6 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 	fd = accept(self->fd, NULL, NULL);
 
 	if (fd >= 0) {
-		struct sockaddr_storage addr;
-		socklen_t addrLen = sizeof(addr);
-		if (getsockname(fd, (struct sockaddr*)&addr, &addrLen) != 0) goto exit_error;
 		Mutex_lock(self->clients.mu);
 		{
 			if (self->clients.size >= self->clients.maxConnections) {
@@ -309,7 +307,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 				if ( self->clients.self[i].server == NULL ) {
 					conSocket = &(self->clients.self[i]);
 					conSocket->fd = fd;
-					conSocket->domain = addr.ss_family;
+					conSocket->domain = self->domain;
 					conSocket->inreset = false;
 					conSocket->server = self;
 					conSocket->idx = i;
@@ -479,7 +477,7 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	return false;
 }
 
-void ClientSocket_close(ClientSocket self) // hal internal use only
+HAL_INTERNAL void ClientSocket_close(ClientSocket self)
 {
 	if (self == NULL) return;
 	if (self->fd >= 0) {
@@ -509,7 +507,7 @@ ClientSocketState ClientSocket_checkConnectState(ClientSocket self)
 	fd_set fdSet;
 	struct timeval timeout;
 
-	bzero(&timeout, sizeof(struct timeval));
+	memset(&timeout, 0, sizeof(struct timeval));
 
 	FD_ZERO(&fdSet);
 	FD_SET(self->fd, &fdSet);

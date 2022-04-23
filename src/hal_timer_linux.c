@@ -21,7 +21,7 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	Timer_endEvent(self);
 
 	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
+	memset(&its, 0, sizeof(struct itimerspec));
 
 	its.it_value.tv_sec = timeout->sec;
 	its.it_value.tv_nsec = timeout->nsec;
@@ -39,7 +39,7 @@ bool Timer_repeatTimeout(Timer self)
 	if (self == NULL) return false;
 
 	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
+	memset(&its, 0, sizeof(struct itimerspec));
 
 	its.it_value.tv_sec = self->lastTimeout.sec;
 	its.it_value.tv_nsec = self->lastTimeout.nsec;
@@ -57,7 +57,7 @@ bool Timer_setPeriod(Timer self, AccurateTime_t *period)
 	Timer_endEvent(self);
 
 	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
+	memset(&its, 0, sizeof(struct itimerspec));
 
 	its.it_value.tv_sec = period->sec;
 	its.it_value.tv_nsec = period->nsec;
@@ -73,7 +73,7 @@ bool Timer_stop(Timer self)
 {
 	if (self == NULL) return false;
 	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
+	memset(&its, 0, sizeof(struct itimerspec));
 	timerfd_settime(self->fd, 0, &its, NULL);
 	Timer_endEvent(self);
 	return true;
@@ -127,7 +127,7 @@ unidesc Timer_setSingleShot(AccurateTime_t *time)
 	}
 
 	struct itimerspec its;
-	bzero(&its, sizeof(struct itimerspec));
+	memset(&its, 0, sizeof(struct itimerspec));
 
 	its.it_value.tv_sec = time->sec;
 	its.it_value.tv_nsec = time->nsec;

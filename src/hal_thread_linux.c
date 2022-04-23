@@ -58,7 +58,7 @@ Mutex Mutex_create(void)
 {
 	Mutex self = calloc(1, sizeof(pthread_mutex_t));
 	pthread_mutexattr_t attr;
-	bzero(&attr, sizeof(pthread_mutexattr_t));
+	memset(&attr, 0, sizeof(pthread_mutexattr_t));
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	pthread_mutex_init((pthread_mutex_t*)self, &attr);
 	return self;

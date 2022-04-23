@@ -13,7 +13,7 @@ int main(int argc, const char **argv)
 	test = atoi(argv[1]);
 // windows: com0com
 // linux: socat PTY,raw,echo=0,link=/tmp/ttyTEST1 PTY,raw,echo=0,link=/tmp/ttyTEST2
-#if defined (_WIN32) || defined (_WIN64)
+#if defined (_WIN32) || defined(_WIN64)
 	const char *com1 = "\\\\.\\COM3";
 	const char *com2 = "\\\\.\\COM4";
 #endif

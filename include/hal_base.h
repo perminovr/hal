@@ -22,7 +22,7 @@
 #ifdef __linux__
 # define HAL_NOT_EMPTY 1
 #endif
-#if defined (_WIN32) || defined (_WIN64)
+#if defined (_WIN32) || defined(_WIN64)
 # define HAL_NOT_EMPTY 1
 #endif
 #ifndef HAL_NOT_EMPTY
@@ -44,24 +44,30 @@
 # endif
 #endif
 
-#if defined (_WIN32) || defined (_WIN64)
+
+#if defined (_WIN32) || defined(_WIN64)
 # ifdef EXPORT_FUNCTIONS_FOR_DLL
 #  define HAL_API __declspec(dllexport)
 # else
-#  define HAL_API extern /*__declspec(dllimport)*/
+#  define HAL_API extern // __declspec(dllimport)
 # endif
 # define HAL_INTERNAL
-#else
+#endif
+#ifdef __linux__
 # if __GNUC__ >= 4
 #  define HAL_API extern __attribute__ ((visibility ("default")))
 #  define HAL_INTERNAL  __attribute__ ((visibility ("hidden")))
-# else
-#  define HAL_API extern
-#  define HAL_INTERNAL
 # endif
 #endif
+#ifndef HAL_API
+# define HAL_API extern
+#endif
+#ifndef HAL_INTERNAL
+# define HAL_INTERNAL
+#endif
 
-#if defined (_WIN32) || defined (_WIN64)
+
+#if defined (_WIN32) || defined(_WIN64)
 # ifndef HAL_LOCAL_SOCK_ADDR
 #  define HAL_LOCAL_SOCK_ADDR "127.0.0.1"
 # endif

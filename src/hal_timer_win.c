@@ -101,6 +101,8 @@ Timer Timer_create(void)
 	Timer self = (Timer)calloc(1, sizeof(struct sTimer));
 	if (self) {
 		self->sig = sig;
+	} else {
+		Signal_destroy(sig);
 	}
 	return self;
 }
