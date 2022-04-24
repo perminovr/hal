@@ -10,6 +10,7 @@
 #include <windows.h>
 
 #include "hal_filesystem.h"
+#include "hal_utils.h"
 
 struct DirectoryHandle_s {
 	HANDLE h;
@@ -22,6 +23,17 @@ FileHandle FileSystem_openFile(const char *fileName, bool readWrite)
 {
 	if (fileName == NULL) return NULL;
 	return (FileHandle) ((readWrite)? fopen(fileName, "ab") : fopen(fileName, "rb"));
+}
+
+FileHandle FileSystem_createFileIn(const char *path, char *filename, char *fullpath)
+{
+	char buf[512];
+	if (!path) return NULL;
+	if (GetTempFileNameA((LPCSTR)path, (LPCSTR)"tmp", 0, (LPSTR)buf) == 0) return NULL;
+	FileSystem_deleteFile(buf);	
+	if (filename) { _splitpath(buf, NULL, NULL, filename, NULL); }
+	if (fullpath) { strcpy(fullpath, buf); }
+	return FileSystem_openFile(buf, true);
 }
 
 int FileSystem_readFile(FileHandle handle, uint8_t *buffer, int maxSize)
@@ -61,6 +73,60 @@ bool FileSystem_renameFile(const char *oldFilename, const char *newFilename)
 	return (rename(oldFilename, newFilename) == 0)? true : false;
 }
 
+bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
+{
+	if (!filename || !fhd) return false;
+	int rc, rc2;
+	uint8_t buf[256];
+	if (fseek((FILE*) fhd, 0, SEEK_SET) != 0) return false;
+	FileHandle fhs = FileSystem_openFile(filename, false);
+	do {
+		rc = FileSystem_readFile(fhs, buf, 256);
+		if (rc > 0) {
+			rc2 = FileSystem_writeFile(fhd, buf, rc);
+			if (rc2 != rc) {
+				FileSystem_closeFile(fhs);
+				FileSystem_closeFile(fhd);
+				return false; 
+			}
+		}
+	} while (rc > 0);	
+	FileSystem_closeFile(fhs);
+	FileSystem_closeFile(fhd);
+	return true;
+}
+
+bool FileSystem_copyFile(const char *filename, const char *newFilename)
+{
+	bool ret = false;
+	if (!filename || !newFilename) return false;
+	FileSystem_deleteFile(newFilename);
+	FileHandle fhd = FileSystem_openFile(newFilename, true);
+	return FileSystem_copyFileH(filename, fhd);
+}
+
+bool FileSystem_getFileMd5Hash(const char *filename, uint8_t *hash)
+{
+	bool ret = false;
+	if (!filename || !hash) return false;
+	FileHandle fh = FileSystem_openFile(filename, false);
+	if (fh) {
+		int rc;
+		uint8_t buf[256];
+		Md5HashContext ctx;
+		md5hash_init(&ctx);
+		do {
+			rc = FileSystem_readFile(fh, buf, 256);
+			if (rc > 0) {
+				md5hash_update(&ctx, buf, rc);
+			}
+		} while (rc > 0);
+		md5hash_final(&ctx, hash);
+		ret = true;
+	}
+	FileSystem_closeFile(fh);
+	return ret;
+}
 
 bool FileSystem_getFileInfo(const char *filename, uint32_t *fileSize, uint64_t *lastModificationTimestamp)
 {

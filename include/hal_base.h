@@ -115,26 +115,4 @@ Hal_unidescIsInvalid(unidesc p);
 HAL_API bool
 Hal_unidescIsEqual(const unidesc *p1, const unidesc *p2);
 
-/**
- * \brief Convert string ipv4 representation to binary
- *
- * \return binary ip data in network byte order
- */
-HAL_API uint32_t
-Hal_ipv4StrToBin(const char *ip);
-
-/**
- * \brief Generate socket port by name
- * 
- * \param name C-string
- * \param min the minimum value of the socket port
- * \param max the maximum value of the socket port
- * 
- * \details val=(max-min) should be higher than 999
- *
- * \return socket port on success or 0 on failure
- */
-HAL_API uint16_t
-Hal_generatePort(const char *name, uint16_t min, uint16_t max);
-
 #endif /* HAL_BASE_H */

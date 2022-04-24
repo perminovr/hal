@@ -3,6 +3,7 @@
 
 #include "hal_socket_dgram.h"
 #include "hal_syshelper.h"
+#include "hal_utils.h"
 #include <stdio.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -11,24 +12,32 @@
 #include <iphlpapi.h>
 #include <windows.h>
 
-#define ETH_ALEN	6
-#define AF_PACKET	17 // yeah, netbios...
-#define MIB_IPADDRTABLE_SZ_MAX (sizeof(DWORD) + sizeof(MIB_IPADDRROW)*128)
 
+typedef enum {
+	ST_Inet,
+	ST_Local,
+	ST_Ether,
+} SocketType_e;
 
 struct sDgramSocket {
+	int domain; // must be first (SocketType_e)
 	SOCKET s;
-	int domain;
 	union uDgramSocketAddress remote;
 	union uDgramSocketAddress localremote;
-	int ifidx;
-	int protocol;
 };
 
 
 static bool prepareSocketAddress(const char *address, uint16_t port, struct sockaddr_in *sockaddr);
-static char *inet_paddr(uint32_t in, char *out);
-static uint32_t getAnyIpFromInterface(ULONG idx);
+
+HAL_INTERNAL DgramSocket EtherDgramSocket_create0(const char *iface, uint16_t ethTypeFilter, int domain);
+HAL_INTERNAL void EtherDgramSocket_close(DgramSocket self);
+HAL_INTERNAL int EtherDgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size);
+HAL_INTERNAL int EtherDgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size);
+HAL_INTERNAL int EtherDgramSocket_read(DgramSocket self, uint8_t *buf, int size);
+HAL_INTERNAL int EtherDgramSocket_write(DgramSocket self, const uint8_t *buf, int size);
+HAL_INTERNAL int EtherDgramSocket_readAvailable(DgramSocket self, bool fromRemote, uint8_t *buf);
+HAL_INTERNAL void EtherDgramSocket_destroy(DgramSocket self);
+HAL_INTERNAL unidesc EtherDgramSocket_getDescriptor(DgramSocket self);
 
 
 static inline void setSocketNonBlocking(SOCKET s)
@@ -68,8 +77,7 @@ DgramSocket UdpDgramSocket_createAndBind(const char *ip, uint16_t port)
 	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
 		self->s = sock;
-		self->domain = AF_INET;
-		self->protocol = -1;
+		self->domain = (int)ST_Inet;
 		setSocketNonBlocking(sock);
 		return self;
 	}
@@ -101,13 +109,10 @@ bool UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *ifac
 {
 	if (self == NULL || ip == NULL || iface == NULL) return false;
 	struct ip_mreq imreqn;
-	ULONG idx = if_nametoindex(iface);
+	char localip[16];
+	if (NetwHlpr_interfaceInfo(iface, NULL, NULL, NULL, localip) == false) return false;
 	inet_pton(AF_INET, ip, &imreqn.imr_multiaddr.s_addr);
-	if (idx != 0) {
-		imreqn.imr_interface.s_addr = getAnyIpFromInterface(idx);
-	} else {
-		inet_pton(AF_INET, iface, &imreqn.imr_interface.s_addr); // ip addr actually
-	}
+	inet_pton(AF_INET, localip, &imreqn.imr_interface.s_addr);
 	if (setsockopt(self->s, IPPROTO_IP, IP_ADD_MEMBERSHIP, (const char *)&imreqn, sizeof(struct ip_mreq)) != 0) {
 		return false;
 	}
@@ -129,16 +134,15 @@ DgramSocket LocalDgramSocket_create(const char *address)
 {
 	if (address == NULL) return NULL;
 
-	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+	uint16_t port = NetwHlpr_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	DgramSocket self = UdpDgramSocket_createAndBind(HAL_LOCAL_SOCK_ADDR, port);
 
 	if (self) {
-		self->domain = AF_UNIX;
+		self->domain = (int)ST_Local;
 	}
 
 	return self;
 }
-
 
 void LocalDgramSocket_unlinkAddress(const char *address)
 {
@@ -146,134 +150,19 @@ void LocalDgramSocket_unlinkAddress(const char *address)
 }
 
 
-// todo EtherDgramSocket
 DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 {
-	if (iface == NULL) return NULL;
-
-	HalShSys_init();
-
-	SOCKET sock = socket(AF_INET, SOCK_RAW, ethTypeFilter);
-	if (sock != INVALID_SOCKET) return NULL;
-
-	// ULONG idx = if_nametoindex(iface);
-	// if (idx != 0) {
-	// 	imreqn.imr_interface.s_addr = getAnyIpFromInterface(idx);
-	// } else {
-	// 	imreqn.imr_interface.s_addr = inet_addr(iface); // ip addr actually
-	// }
-
-	// int idx;
-	// int sockopt;
-	// struct packet_mreq mreq;
-
-	// bzero(&mreq, sizeof(struct packet_mreq));
-
-	// idx = (int)if_nametoindex(iface);
-
-	// mreq.mr_ifindex = idx;
-	// mreq.mr_type = PACKET_MR_PROMISC;
-
-	// sockopt = 1;
-	// if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char *)&sockopt, sizeof(sockopt)) != 0) goto exit_error;
-	// if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, iface, IFNAMSIZ-1) != 0) goto exit_error;
-	// if (setsockopt(sock, SOL_PACKET, PACKET_ADD_MEMBERSHIP, (const char *)&mreq, sizeof(mreq)) != 0) goto exit_error;
-
-	// DgramSocket self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
-	// if (self) {
-	// 	self->s = sock;
-	// 	self->domain = AF_PACKET;
-	// 	self->protocol = ethTypeFilter;
-	// 	setSocketNonBlocking(sock);
-	// 	return self;
-	// }
-
-// exit_error:
-	closesocket(sock);
-	return NULL;
-}
-
-int EtherDgramSocket_setHeader(uint8_t *header, const uint8_t *src, const uint8_t *dst, uint16_t ethType)
-{
-	if (header == NULL || src == NULL || dst == NULL) return -1;
-	memcpy(header, dst, ETH_ALEN);
-	header += ETH_ALEN;
-	memcpy(header, src, ETH_ALEN);
-	header += ETH_ALEN;
-	*((uint16_t*)header) = ntohs(ethType);
-	header += 2;
-	return 14;
-}
-
-void EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, uint16_t *ethType)
-{
-	if (header == NULL || src == NULL || dst == NULL || ethType == NULL) return;
-	memcpy(dst, header, ETH_ALEN);
-	header += ETH_ALEN;
-	memcpy(src, header, ETH_ALEN);
-	header += ETH_ALEN;
-	*ethType = ntohs( *((uint16_t*)header) );
-	header += 2;
-}
-
-bool EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr)
-{
-	if (iface == NULL || addr == NULL) return false;
-
-	union {
-		MIB_IPADDRTABLE t;
-		char max[MIB_IPADDRTABLE_SZ_MAX];
-	} u;
-	ULONG sz = sizeof(u);
-	MIB_IPADDRROW *tt;
-	MIB_IFROW r;
-
-	DWORD idx = if_nametoindex(iface); // 0 if error
-	DWORD waddr = 0;
-	inet_pton(AF_INET, iface, &waddr);
-
-	if ( GetIpAddrTable(&u.t, &sz, FALSE) == 0 ) {
-		for (DWORD i = 0; i < u.t.dwNumEntries; ++i) {
-			tt = &u.t.table[i];
-			if (!tt->dwIndex) continue;
-			if (tt->dwIndex == idx || tt->dwAddr == waddr) {
-				memset(&r, 0, sizeof(r));
-				r.dwIndex = tt->dwIndex;
-				GetIfEntry(&r);
-				if (r.dwType == MIB_IF_TYPE_ETHERNET) {
-					memcpy(addr, r.bPhysAddr, ETH_ALEN);
-					return true;
-				}
-			}
-		}
-	}
-	return false;
-}
-
-uint8_t *EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr)
-{
-	if (self == NULL || addr == NULL) return NULL;
-	if (self->s != INVALID_SOCKET) {
-		char ifname[32];
-		if ( EtherDgramSocket_getInterfaceMACAddress(
-				(const char *)if_indextoname(self->ifidx, ifname),
-				addr)
-		) {
-			return addr;
-		}
-	}
-	return NULL;
+	return EtherDgramSocket_create0(iface, ethTypeFilter, (int)ST_Ether);
 }
 
 
 bool DgramSocket_reset(DgramSocket self)
 {
 	if (self == NULL) return false;
-	if (self->domain != AF_INET) return false;
+	if (self->domain != (int)ST_Inet) return false;
 	if (self->s != INVALID_SOCKET) {
 		closesocket(self->s);
-		uint16_t protocol = (self->protocol != -1)? (uint16_t)self->protocol : 0;
-		self->s = socket(AF_INET, SOCK_DGRAM, protocol);
+		self->s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (self->s != INVALID_SOCKET) {
 			return true;
 		}
@@ -281,9 +170,13 @@ bool DgramSocket_reset(DgramSocket self)
 	return false;
 }
 
-void DgramSocket_close(DgramSocket self) // hal internal use only
+HAL_INTERNAL void DgramSocket_close(DgramSocket self)
 {
 	if (self == NULL) return;
+	if (self->domain == (int)ST_Ether) {
+		EtherDgramSocket_close(self);
+		return;
+	}
 	if (self->s != INVALID_SOCKET) {
 		closesocket(self->s);
 		self->s = INVALID_SOCKET;
@@ -293,9 +186,9 @@ void DgramSocket_close(DgramSocket self) // hal internal use only
 void DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr)
 {
 	if (self == NULL || addr == NULL) return;
-	if (self->domain == AF_UNIX) {
+	if (self->domain == (int)ST_Local) {
 		memcpy(&self->localremote, addr, sizeof(union uDgramSocketAddress));
-		self->remote.port = Hal_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+		self->remote.port = NetwHlpr_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 		strcpy(self->remote.ip, HAL_LOCAL_SOCK_ADDR);
 	} else {
 		memcpy(&self->remote, addr, sizeof(union uDgramSocketAddress));
@@ -305,7 +198,7 @@ void DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr)
 void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 {
 	if (self == NULL || addr == NULL) return;
-	if (self->domain == AF_UNIX) {
+	if (self->domain == (int)ST_Local) {
 		memcpy(addr, &self->localremote, sizeof(union uDgramSocketAddress));
 	} else {
 		memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));		
@@ -315,40 +208,14 @@ void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size, int flags)
 {
 	struct sockaddr_storage saddr;
-	socklen_t addr_size;
+	socklen_t addr_size = sizeof(struct sockaddr_in);
 	memset(&saddr, 0, sizeof(struct sockaddr_storage));
-	switch (self->domain) {
-		case AF_INET: {
-			addr_size = sizeof(struct sockaddr_in);
-		} break;
-		case AF_UNIX: {
-			addr_size = sizeof(struct sockaddr_in);
-		} break;
-		case AF_PACKET: {
-			addr_size = sizeof(struct sockaddr_dl);
-		} break;
-		default: break;
-	}
 	int rc = recvfrom(self->s, buf, size, flags, (struct sockaddr *)&saddr, &addr_size);
 	if (rc > 0) {
 		if (addr) {
-			switch (self->domain) {
-				case AF_INET: {
-					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-					inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
-					addr->port = htons(paddr->sin_port);
-				} break;
-				case AF_UNIX: {
-					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-					inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
-					addr->port = htons(paddr->sin_port);
-				} break;
-				case AF_PACKET: {
-					struct sockaddr_dl *paddr = (struct sockaddr_dl *)&saddr;
-					memcpy(addr->mac, paddr->sdl_data, ETH_ALEN);
-				} break;
-				default: break;
-			}
+			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
+			Hal_ipv4BinToStr(htonl(paddr->sin_addr.s_addr), addr->ip);
+			addr->port = htons(paddr->sin_port);
 		}
 	}
 	return rc;
@@ -357,45 +224,40 @@ static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *bu
 int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size)
 {
 	if (self == NULL || addr == NULL || buf == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_readFrom(self, addr, buf, size);
+	}
 	return socketReadFrom(self, addr, buf, size, 0);
 }
 
 int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size)
 {
 	if (self == NULL || addr == NULL || buf == NULL) return -1;
-	struct sockaddr_storage saddr;
-	socklen_t addr_size = 0;
-	memset(&saddr, 0, sizeof(struct sockaddr_storage));
-	switch (self->domain) {
-		case AF_INET: {
-			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-			addr_size = sizeof(struct sockaddr_in);
-			inet_pton(AF_INET, addr->ip, &paddr->sin_addr.s_addr);
-			paddr->sin_family = AF_INET;
-			paddr->sin_port = htons(addr->port);
-		} break;
-		case AF_UNIX: {
-			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-			addr_size = sizeof(struct sockaddr_in);
-			uint16_t port = Hal_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
-			inet_pton(AF_INET, HAL_LOCAL_SOCK_ADDR, &paddr->sin_addr.s_addr);
-			paddr->sin_family = AF_INET;
-			paddr->sin_port = htons(port);
-		} break;
-		case AF_PACKET: {
-			const uint8_t *src = buf+6;
-			struct sockaddr_dl *paddr = (struct sockaddr_dl *)&saddr;
-			addr_size = sizeof(struct sockaddr_dl);
-			memcpy(paddr->sdl_data, src, ETH_ALEN);
-		} break;
-		default: break;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_writeTo(self, addr, buf, size);
 	}
+	struct sockaddr_storage saddr;
+	socklen_t addr_size = sizeof(struct sockaddr_in);
+	struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
+	memset(&saddr, 0, sizeof(struct sockaddr_storage));
+	const char *ip = addr->ip;
+	uint16_t port = addr->port;
+	if (self->domain == (int)ST_Local) {
+		port = NetwHlpr_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+		ip = HAL_LOCAL_SOCK_ADDR;
+	}
+	inet_pton(AF_INET, ip, &paddr->sin_addr.s_addr);
+	paddr->sin_family = AF_INET;
+	paddr->sin_port = htons(port);
 	return sendto(self->s, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
 }
 
 int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_read(self, buf, size);
+	}
 	int rc = DgramSocket_readAvailable(self, true);
 	if (rc <= 0) return rc;
 	return socketReadFrom(self, NULL, buf, size, 0);
@@ -404,37 +266,31 @@ int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
 int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
-	DgramSocketAddress addr = &self->remote;	
-	struct sockaddr_storage saddr;
-	socklen_t addr_size = 0;
-	memset(&saddr, 0, sizeof(struct sockaddr_storage));
-	switch (self->domain) {
-		case AF_UNIX:
-		case AF_INET: {
-			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-			addr_size = sizeof(struct sockaddr_in);
-			inet_pton(AF_INET, addr->ip, &paddr->sin_addr.s_addr);
-			paddr->sin_family = AF_INET;
-			paddr->sin_port = htons(addr->port);
-		} break;
-		case AF_PACKET: {
-			const uint8_t *src = buf+6;
-			struct sockaddr_dl *paddr = (struct sockaddr_dl *)&saddr;
-			addr_size = sizeof(struct sockaddr_dl);
-			memcpy(paddr->sdl_data, src, ETH_ALEN);
-		} break;
-		default: break;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_write(self, buf, size);
 	}
+	DgramSocketAddress addr = &self->remote;
+	struct sockaddr_storage saddr;
+	socklen_t addr_size = sizeof(struct sockaddr_in);
+	struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
+	memset(&saddr, 0, sizeof(struct sockaddr_storage));	
+	inet_pton(AF_INET, addr->ip, &paddr->sin_addr.s_addr);
+	paddr->sin_family = AF_INET;
+	paddr->sin_port = htons(addr->port);
 	return sendto(self->s, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
 }
 
 int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 {
 	if (self == NULL) return -1;
-
-	uint8_t buf[65535]; // WSAEMSGSIZE 
+	uint8_t buf[65535]; // WSAEMSGSIZE
 	union uDgramSocketAddress source;
 	int ret, rc;
+
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_readAvailable(self, fromRemote, buf);
+	}
+
 	while (1) {
 		ret = getSocketAvailableToRead(self->s);
 		if (ret <= 0) return ret;
@@ -442,23 +298,8 @@ int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 		//
 		rc = socketReadFrom(self, &source, buf, sizeof(buf), MSG_PEEK);
 		if (rc > 0) {
-			switch (self->domain) {
-				case AF_INET: {
-					if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
-						return ret;
-					}
-				} break;
-				case AF_UNIX: {
-					if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
-						return ret;
-					}
-				} break;
-				case AF_PACKET: {
-					if (memcmp(source.mac, self->remote.mac, ETH_ALEN) == 0) {
-						return ret;
-					}
-				} break;
-				default: break;
+			if (source.port == self->remote.port && strcmp(source.ip, self->remote.ip) == 0) {
+				return ret;
 			}
 			socketReadFrom(self, &source, buf, sizeof(buf), 0); // flush
 		} else {
@@ -470,6 +311,10 @@ int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 void DgramSocket_destroy(DgramSocket self)
 {
 	if (self == NULL) return;
+	if (self->domain == (int)ST_Ether) {
+		EtherDgramSocket_destroy(self);
+		return;
+	}
 	DgramSocket_close(self);
 	HalShSys_deinit();
 	free(self);
@@ -478,6 +323,9 @@ void DgramSocket_destroy(DgramSocket self)
 unidesc DgramSocket_getDescriptor(DgramSocket self)
 {
 	if (self) {
+		if (self->domain == (int)ST_Ether) {
+			return EtherDgramSocket_getDescriptor(self);
+		}
 		unidesc ret;
 		ret.u64 = (uint64_t)self->s;
 		return ret;
@@ -515,46 +363,6 @@ static bool prepareSocketAddress(const char *address, uint16_t port, struct sock
 	sockaddr->sin_port = htons(port);
 
 	return retVal;
-}
-
-static char *inet_paddr(uint32_t in, char *out)
-{
-	char *ret = 0;
-	union { uint32_t u32; uint8_t b[4]; } addr;
-	addr.u32 = in;
-	if ( sprintf(out, "%hhu.%hhu.%hhu.%hhu",
-			addr.b[3], addr.b[2], addr.b[1], addr.b[0]) == 4 )
-	{
-		ret = out;
-	}
-	return ret;
-}
-
-static uint32_t getAnyIpFromInterface(ULONG idx)
-{
-	union {
-		MIB_IPADDRTABLE t;
-		char max[MIB_IPADDRTABLE_SZ_MAX];
-	} u;
-	ULONG sz = sizeof(u);
-	MIB_IPADDRROW *tt;
-	MIB_IFROW r;
-
-	if ( GetIpAddrTable(&u.t, &sz, FALSE) == 0 ) {
-		for (DWORD i = 0; i < u.t.dwNumEntries; ++i) {
-			tt = &u.t.table[i];
-			if (!tt->dwIndex) continue;
-			if (tt->dwIndex == idx || tt->dwAddr == 0x0100007f) {
-				memset(&r, 0, sizeof(r));
-				r.dwIndex = tt->dwIndex;
-				GetIfEntry(&r);
-				if (r.dwType == MIB_IF_TYPE_ETHERNET) {
-					return tt->dwAddr;
-				}
-			}
-		}
-	}
-	return 0;
 }
 
 

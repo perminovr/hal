@@ -19,7 +19,7 @@ typedef enum {
 struct sSerialPort {
 	char interfaceName[32];
 	HANDLE h;
-	HalShFdescHelper fdh;
+	ShDescStream sds;
 	int baudRate;
 	uint8_t dataBits;
 	char parity;
@@ -36,7 +36,7 @@ SerialPort SerialPort_create(const char *interfaceName)
 	SerialPort self = (SerialPort)calloc(1, sizeof(struct sSerialPort));
 	if (self != NULL) {
 		self->state = CREATED;
-		self->fdh = NULL;
+		self->sds = NULL;
 		self->h = INVALID_HANDLE_VALUE;
 		self->baudRate = 9600;
 		self->dataBits = 8;
@@ -52,8 +52,8 @@ SerialPort SerialPort_create(const char *interfaceName)
 static void SerialPort_checkAndClose(SerialPort self)
 {
 	if (self->state > INITED) {
-		HalShFdescHelper_destroy(self->fdh);
-		self->fdh = NULL;
+		ShDescStream_destroy(self->sds);
+		self->sds = NULL;
 		CloseHandle(self->h);
 		self->h = INVALID_HANDLE_VALUE;
 		self->state = INITED;
@@ -193,8 +193,8 @@ bool SerialPort_open(SerialPort self)
 	unidesc ud; ud.u64 = (uint64_t)self->h;
 	int charsSpacing = (int)((8000.0f / (float)self->baudRate) * 5); // 5 symbols
 	charsSpacing += (charsSpacing)? 0 : 1;
-	self->fdh = HalShFdescHelper_create(ud, 256, charsSpacing);
-	if (!self->fdh) {
+	self->sds = ShDescStream_create(ud, 256, charsSpacing);
+	if (!self->sds) {
 		self->lastError = SERIAL_PORT_ERROR_UNKNOWN;
 		goto exit_error;
 	}
@@ -233,7 +233,7 @@ static int SerialPort_readByteTimeout(SerialPort self, SOCKET s, struct timeval 
 	} else if (ret == 0) {
 		return -1;
 	} else {
-		rc = HalShFdescHelper_read(self->fdh, buf, 1);
+		rc = ShDescStream_read(self->sds, buf, 1);
 		if (rc > 0) return (int)buf[0];
 		return -1;
 	}
@@ -278,14 +278,14 @@ int SerialPort_write(SerialPort self, uint8_t *buffer, int bufSize)
 {
 	if (self == NULL || buffer == NULL) return -1;
 	self->lastError = SERIAL_PORT_ERROR_NONE;
-	return HalShFdescHelper_write(self->fdh, buffer, bufSize);
+	return ShDescStream_write(self->sds, buffer, bufSize);
 }
 
 unidesc SerialPort_getDescriptor(SerialPort self)
 {
 	if (self) {
-		if (self->fdh) {
-			return HalShFdesc_getDescriptor(HalShFdescHelper_getDescriptor(self->fdh));
+		if (self->sds) {
+			return ShDescStream_getDescriptor(self->sds);
 		}
 	}
 	return Hal_getInvalidUnidesc();

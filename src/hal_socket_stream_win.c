@@ -4,16 +4,21 @@
 #include "hal_socket_stream.h"
 #include "hal_thread.h"
 #include "hal_syshelper.h"
+#include "hal_utils.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <mswsock.h>
 #include <netioapi.h>
 #include <windows.h>
 
+typedef enum {
+	ST_Inet,
+	ST_Local,
+} SocketType_e;
 
 struct sClientSocket {
+	int domain; // SocketType_e
 	SOCKET s;
-	int domain;
 	bool inreset;
 	//
 	ServerSocket server;
@@ -29,8 +34,8 @@ struct sClients {
 };
 
 struct sServerSocket {
+	int domain; // SocketType_e
 	SOCKET s;
-	int domain;
 	struct sClients clients;
 };
 
@@ -90,7 +95,7 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 		self->clients.self = (struct sClientSocket *)calloc(maxConnections, sizeof(struct sClientSocket));
 		if (self->clients.self) {
 			self->s = sock;
-			self->domain = AF_INET;
+			self->domain = (int)ST_Inet;
 			self->clients.maxConnections = maxConnections;
 			self->clients.mu = mu;
 			setSocketNonBlocking(sock);
@@ -134,7 +139,7 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 	self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
 		self->s = sock;
-		self->domain = AF_INET;
+		self->domain = (int)ST_Inet;
 		self->inreset = true;
 		self->server = NULL;
 		self->idx = -1;
@@ -185,11 +190,11 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 {
 	if (address == NULL) return NULL;
 
-	uint16_t port = Hal_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+	uint16_t port = NetwHlpr_generatePort(address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	ServerSocket self = TcpServerSocket_create(maxConnections, HAL_LOCAL_SOCK_ADDR, port);
 
 	if (self) {
-		self->domain = AF_UNIX;
+		self->domain = (int)ST_Local;
 	}
 
 	return self;
@@ -212,7 +217,7 @@ ClientSocket LocalClientSocket_create(void)
 	ClientSocket self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
 		self->s = sock;
-		self->domain = AF_UNIX;
+		self->domain = (int)ST_Local;
 		self->inreset = true;
 		self->server = NULL;
 		self->idx = -1;
@@ -242,9 +247,6 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 	sock = accept(self->s, NULL, NULL);
 
 	if (sock != INVALID_SOCKET) {
-		struct sockaddr_storage addr;
-		socklen_t addrLen = sizeof(addr);
-		if (getsockname(sock, (struct sockaddr*)&addr, &addrLen) != 0) goto exit_error;
 		Mutex_lock(self->clients.mu);
 		{
 			if (self->clients.size >= self->clients.maxConnections) {
@@ -255,7 +257,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 				if ( self->clients.self[i].server == NULL ) {
 					conSocket = &(self->clients.self[i]);
 					conSocket->s = sock;
-					conSocket->domain = addr.ss_family;
+					conSocket->domain = self->domain;
 					conSocket->inreset = false;
 					conSocket->server = self;
 					conSocket->idx = i;
@@ -372,18 +374,14 @@ bool ClientSocket_connectAsync(ClientSocket self, const ClientSocketAddress addr
 	if (self->server) return false;
 
 	struct sockaddr_in serverAddress;
-
-	switch (self->domain) {
-		case AF_INET: {
-			if (!prepareSocketAddress(address->ip, address->port, &serverAddress))
-				return false;
-		} break;
-		case AF_UNIX: {
-			uint16_t port = Hal_generatePort(address->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
-			if (!prepareSocketAddress(HAL_LOCAL_SOCK_ADDR, port, &serverAddress))
-				return false;
-		} break;
+	const char *ip = address->ip;
+	uint16_t port = address->port;
+	if (self->domain == (int)ST_Local) {
+		ip = HAL_LOCAL_SOCK_ADDR;
+		port = NetwHlpr_generatePort(address->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
 	}
+	if (!prepareSocketAddress(ip, port, &serverAddress))
+		return false;
 	if (connect(self->s, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
 		if (WSAGetLastError() != WSAEWOULDBLOCK) {
 			return false;
@@ -424,7 +422,7 @@ bool ClientSocket_connect(ClientSocket self, const ClientSocketAddress address, 
 	return false;
 }
 
-void ClientSocket_close(ClientSocket self) // hal internal use only
+HAL_INTERNAL void ClientSocket_close(ClientSocket self)
 {
 	if (self == NULL) return;
 	if (self->s != INVALID_SOCKET) {

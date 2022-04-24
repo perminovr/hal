@@ -4,10 +4,11 @@
 #include "hal_poll.h"
 #include "hal_thread.h"
 #include "hal_time.h"
+#include "hal_utils.h"
 
 #define err() printf("%s:%d\n", __FILE__, __LINE__)
 
-static void prepEthFrame(uint8_t *buf)
+static int prepEthFrame(uint8_t *buf)
 {
 	static const uint8_t goose[] = {
 		0x01, 0x0c, 0xcd, 0x01, 0x00, 0x00, 0x08, 0x00, 0x27, 0x62, 0xb8, 0xa2, 0x81, 0x00, 0x80, 0x00,
@@ -21,6 +22,7 @@ static void prepEthFrame(uint8_t *buf)
 		0x83, 0x01, 0x00, 0x83, 0x01, 0x00, 0x83, 0x01, 0x00
 	};
 	memcpy(buf, goose, sizeof(goose));
+	return sizeof(goose);
 }
 
 int main(int argc, const char **argv)
@@ -31,7 +33,20 @@ int main(int argc, const char **argv)
 	union uDgramSocketAddress addr;
 	int rc, revents;
 	char buf[65535];
-	#if defined (_WIN32) || defined (_WIN64)
+	uint8_t *mac1 = (uint8_t *)buf+10000;
+	uint8_t *mac2 = (uint8_t *)buf+10006;
+	uint8_t *fr1 = (uint8_t *)buf+0;
+	uint8_t *fr2 = (uint8_t *)buf+2000;
+	uint8_t *fr1_mac_s = fr1+6;
+	uint8_t *fr1_mac_d = fr1+0;
+	uint8_t *fr1_type = fr1+12;
+	uint8_t *fr1_data = fr1+14;
+	uint8_t *fr2_mac_s = fr2+6;
+	uint8_t *fr2_mac_d = fr2+0;
+	uint8_t *fr2_type = fr2+12;
+	uint8_t *fr2_data = fr2+14;
+	int prepsz = prepEthFrame(fr1);
+	#if defined (_WIN32) || defined(_WIN64)
 	const char *iface = "loopback_0";
 	#endif
 	#if defined(__linux__)
@@ -421,32 +436,154 @@ int main(int argc, const char **argv)
 			DgramSocket_destroy(s3);
 			return 0;
 		} break;
-		case 21: {
-			uint8_t *mac1 = (uint8_t *)buf+10000;
-			uint8_t *mac2 = (uint8_t *)buf+10006;
-			uint8_t *fr1 = (uint8_t *)buf+0;
-			uint8_t *fr2 = (uint8_t *)buf+2000;
-			uint8_t *fr1_mac_s = fr1+6;
-			uint8_t *fr1_mac_d = fr1+0;
-			uint8_t *fr1_type = fr1+12;
-			uint8_t *fr1_data = fr1+14;
-			uint8_t *fr2_mac_s = fr2+6;
-			uint8_t *fr2_mac_d = fr2+0;
-			uint8_t *fr2_type = fr2+12;
-			uint8_t *fr2_data = fr2+14;
-			prepEthFrame(fr1);
+		case 21: { // eth base
+			// link
 			s1 = EtherDgramSocket_create(iface, 0);
 			s2 = EtherDgramSocket_create(iface, 0);
+			memcpy(addr.mac, fr1_mac_d, 6);
+			DgramSocket_setRemote(s1, &addr);
+			memcpy(addr.mac, fr1_mac_s, 6);
+			DgramSocket_setRemote(s2, &addr);
+			memset(&addr, 0, sizeof(addr));
+			DgramSocket_getRemote(s1, &addr);
+			if ( memcmp(addr.mac, fr1_mac_d, 6) != 0 ) { err(); return 1; }
+			// write
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			// check available
+			rc = DgramSocket_readAvailable(s2, true);
+			if (rc != prepsz) { err(); return 1; }
+			// write next dgram
+			rc = DgramSocket_writeTo(s1, &addr, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			// read
+			rc = DgramSocket_read(s2, fr2, prepsz+1);
+			if (rc != prepsz) { err(); return 1; }
+			rc = DgramSocket_readFrom(s2, &addr, fr2, prepsz+1);
+			if (rc != prepsz) { err(); return 1; }
+			if ( memcmp(addr.mac, fr1_mac_s, 6) != 0 ) { err(); return 1; }
+			for (int i = 0; i < prepsz; ++i) {
+				if (fr1[i] != fr2[i]) { err(); return 1; }
+			}
 			// clean
 			DgramSocket_destroy(s1);
 			DgramSocket_destroy(s2);
 			return 0;
 		} break;
-		// EtherDgramSocket_create
-		// EtherDgramSocket_setHeader
-		// EtherDgramSocket_getHeader
-		// EtherDgramSocket_getInterfaceMACAddress
-		// EtherDgramSocket_getSocketMACAddress
+		case 22: { // eth reset
+			// link
+			s1 = EtherDgramSocket_create(iface, 0);
+			s2 = EtherDgramSocket_create(iface, 0);
+			memcpy(addr.mac, fr1_mac_d, 6);
+			DgramSocket_setRemote(s1, &addr);
+			memcpy(addr.mac, fr1_mac_s, 6);
+			DgramSocket_setRemote(s2, &addr);
+			// wr/rd 1
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			rc = DgramSocket_read(s2, fr2, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			for (int i = 0; i < prepsz; ++i) {
+				if (fr1[i] != fr2[i]) { err(); return 1; }
+			}
+			// reset
+			DgramSocket_reset(s1);
+			// wr/rd 2
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			rc = DgramSocket_read(s2, fr2, prepsz);
+			if (rc != prepsz) { err(); return 1; }			
+			for (int i = 0; i < prepsz; ++i) {
+				if (fr1[i] != fr2[i]) { err(); return 1; }
+			}
+			// clean
+			DgramSocket_destroy(s1);
+			DgramSocket_destroy(s2);
+			return 0;
+		} break;
+		case 23: { // eth desc
+			uint64_t ts, ts0;
+			// link
+			s1 = EtherDgramSocket_create(iface, 0);
+			s2 = EtherDgramSocket_create(iface, 0);
+			memcpy(addr.mac, fr1_mac_d, 6);
+			DgramSocket_setRemote(s1, &addr);
+			memcpy(addr.mac, fr1_mac_s, 6);
+			DgramSocket_setRemote(s2, &addr);
+			// write
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			// check poll
+			ts0 = Hal_getTimeInMs();
+			rc = Hal_pollSingle(DgramSocket_getDescriptor(s2), HAL_POLLIN|HAL_POLLOUT, &revents, 100);
+			ts = Hal_getTimeInMs() - ts0;
+			if (rc <= 0) { err(); return 1; }
+			if ( (revents&HAL_POLLIN) == 0) { err(); return 1; }
+			if ( (revents&HAL_POLLOUT) == 0) { err(); return 1; }
+			if (ts > 20) { err(); return 1; }
+			// clean
+			DgramSocket_destroy(s1);
+			DgramSocket_destroy(s2);
+			return 0;
+		} break;
+		case 24: { // eth parthner filter
+			// link
+			s1 = EtherDgramSocket_create(iface, 0);
+			s2 = EtherDgramSocket_create(iface, 0);
+			memcpy(addr.mac, fr1_mac_d, 6);
+			DgramSocket_setRemote(s1, &addr);
+			memcpy(addr.mac, fr1_mac_s, 6);
+			DgramSocket_setRemote(s2, &addr);
+			// write
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			fr1_mac_s[3] = ~fr1_mac_s[3]; // change source
+			rc = DgramSocket_write(s1, fr1, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			// read 
+			rc = DgramSocket_read(s2, fr2, prepsz);
+			if (rc != prepsz) { err(); return 1; }
+			rc = DgramSocket_readAvailable(s2, true);
+			if (rc != 0) { err(); return 1; }
+			rc = DgramSocket_read(s2, fr2, prepsz);
+			if (rc != 0) { err(); return 1; }
+			// clean
+			DgramSocket_destroy(s1);
+			DgramSocket_destroy(s2);
+			return 0;
+		} break;
+		case 25: { // eth MAC
+			s1 = EtherDgramSocket_create(iface, 0);
+			if (NetwHlpr_getInterfaceMACAddress(iface, buf) != true) { err(); return 1; }
+			if (EtherDgramSocket_getMACAddress(s1, buf+6) == NULL) { err(); return 1; }
+			if ( memcmp(buf, buf+6, 6) != 0 ) { err(); return 1; }
+			DgramSocket_destroy(s1);
+			return 0;
+		} break;
+		case 26: { // eth header
+			uint16_t ethType;
+			union {
+				struct {
+					uint8_t dst[6];
+					uint8_t src[6];
+					uint16_t ethType;
+				} s;
+				uint8_t r[14];
+			} u;
+			for (int i = 0; i < 14; ++i) {
+				buf[i] = (char)i;
+			}
+			EtherDgramSocket_getHeader(buf, u.s.src, u.s.dst, &ethType);
+			u.s.ethType = ((ethType & 0xff) << 8) | ((ethType & 0xff00) >> 8);
+			if ( memcmp(u.r, buf, 14) != 0 ) { err(); return 1; }
+			for (int i = 0; i < 14; ++i) {
+				u.r[i] = (char)i+11;
+			}
+			ethType = ((u.s.ethType & 0xff) << 8) | ((u.s.ethType & 0xff00) >> 8);
+			EtherDgramSocket_setHeader(buf, u.s.src, u.s.dst, ethType);
+			if ( memcmp(u.r, buf, 14) != 0 ) { err(); return 1; }
+			return 0;
+		} break;
 	}
 
 	{ err(); return 1; }

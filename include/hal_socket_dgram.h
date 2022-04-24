@@ -1,6 +1,7 @@
 #ifndef HAL_SOCKET_DGRAM_H
 #define HAL_SOCKET_DGRAM_H
 
+
 #include "hal_base.h"
 
 
@@ -81,7 +82,7 @@ UdpDgramSocket_bind(DgramSocket self, const char *ip, uint16_t port);
  *
  * \param self the socket instance
  * \param ip ip v4 of the group
- * \param iface Local IP address of the interface (for windows only) or the ID of the Ethernet interface (for windows and other)
+ * \param iface the ID of the Ethernet interface (number, name or ip address on the interface)
  *
  * \return true in case of success, false otherwise
  */
@@ -119,7 +120,7 @@ LocalDgramSocket_unlinkAddress(const char *address);
 /**
  * \brief Create a ethernet socket
  *
- * \param iface the ID of the Ethernet interface
+ * \param iface the ID of the Ethernet interface (number, name or ip address on the interface)
  * \param ethTypeFilter ether type receiving filter. If parameter equals to zero,
  * when no filter is applied (all packets will be received)
  *
@@ -153,19 +154,6 @@ HAL_API void
 EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, uint16_t *ethType);
 
 /**
- * \brief Return the MAC address of an Ethernet interface.
- *
- * The result are the six bytes that make up the Ethernet MAC address.
- *
- * \param iface Local IP address of the interface (for windows only) or the ID of the Ethernet interface (for windows and other)
- * \param addr pointer to a buffer to store the MAC address. At least 6 bytes length
- *
- * \return true in case of success, false otherwise
- */
-HAL_API bool
-EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr);
-
-/**
  * \brief Return the MAC address of the socket.
  *
  * The result are the six bytes that make up the Ethernet MAC address.
@@ -176,7 +164,7 @@ EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr);
  * \return pointer to addr in case of success, NULL otherwise
  */
 HAL_API uint8_t *
-EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr);
+EtherDgramSocket_getMACAddress(DgramSocket self, uint8_t *addr);
 
 
 /*! @} */

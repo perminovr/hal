@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include "hal_filesystem.h"
+#include "hal_utils.h"
 
 #define err() printf("%s:%d\n", __FILE__, __LINE__)
 
@@ -133,6 +134,121 @@ int main(int argc, const char **argv)
 			// remove dir
 			rc = (int)FileSystem_deleteDirectory("testdir0");
 			if (rc == 0) { err(); return 1; }
+			return 0;
+		} break;
+		case 6: { // create file in
+			char filename[256];
+			char fullpath[256];
+			rc = (int)FileSystem_createDirectory("testdir");
+			if (rc == 0) { err(); return 1; }
+			h = FileSystem_createFileIn("testdir", filename, fullpath);
+			if (h == NULL) { err(); return 1; }
+			if (strstr(fullpath, "testdir") == NULL) { err(); return 1; }
+			if (strlen(filename) == 0) { err(); return 1; }
+			FileSystem_closeFile(h);
+			rc = (int)FileSystem_deleteFile(fullpath);
+			if (rc == 0) { err(); return 1; }
+			rc = (int)FileSystem_deleteDirectory("testdir");
+			if (rc == 0) { err(); return 1; }
+			return 0;
+		} break;
+		case 7: { // file copy
+			// clean before
+			FileSystem_deleteFile("testfile");
+			FileSystem_deleteFile("testfile0");
+			// write
+			h = FileSystem_openFile("testfile", true);
+			if (h == NULL) { err(); return 1; }
+			for (int i = 0; i < 65535; ++i) {
+				buf[i] = (char)i;
+			}
+			rc = FileSystem_writeFile(h, buf, 65535);
+			if (rc != 65535) { err(); return 1; }
+			FileSystem_closeFile(h);
+			// copy
+			rc = (int)FileSystem_copyFile("testfile", "testfile0");
+			if (rc == 0) { err(); return 1; }
+			// read
+			memset(buf, 0, 65535);
+			h = FileSystem_openFile("testfile0", false);
+			if (h == NULL) { err(); return 1; }
+			rc = FileSystem_readFile(h, buf, 65535);
+			if (rc != 65535) { err(); return 1; }
+			for (int i = 0; i < 65535; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
+			FileSystem_closeFile(h);
+			// clean
+			rc = (int)FileSystem_deleteFile("testfile");
+			if (rc == 0) { err(); return 1; }
+			rc = (int)FileSystem_deleteFile("testfile0");
+			if (rc == 0) { err(); return 1; }
+			return 0;
+		} break;
+		case 8: { // file copy h
+			// clean before
+			FileSystem_deleteFile("testfile");
+			// write
+			h = FileSystem_openFile("testfile", true);
+			if (h == NULL) { err(); return 1; }
+			for (int i = 0; i < 65535; ++i) {
+				buf[i] = (char)i;
+			}
+			rc = FileSystem_writeFile(h, buf, 65535);
+			if (rc != 65535) { err(); return 1; }
+			// close
+			FileSystem_closeFile(h);
+			// copy
+			char fullpath[256];
+			FileHandle h2 = FileSystem_createFileIn(".", NULL, fullpath);
+			if (h2 == NULL) { err(); return 1; }
+			rc = (int)FileSystem_copyFileH("testfile", h2);
+			if (rc == 0) { err(); return 1; }
+			// reopen
+			h2 = FileSystem_openFile(fullpath, false);
+			// read
+			memset(buf, 0, 65535);
+			rc = FileSystem_readFile(h2, buf, 65535); printf("%d\n", rc);
+			if (rc != 65535) { err(); return 1; }
+			for (int i = 0; i < 65535; ++i) {
+				if (buf[i] != (char)i) { err(); return 1; }
+			}
+			// clean
+			FileSystem_closeFile(h2);
+			rc = (int)FileSystem_deleteFile("testfile");
+			if (rc == 0) { err(); return 1; }
+			rc = (int)FileSystem_deleteFile(fullpath);
+			if (rc == 0) { err(); return 1; }
+			return 0;
+		} break;
+		case 9: { // file md5
+			const char *text = "ljalsml;masldjdh1u876tr19oghqbv szc9j9\naskc9j0asjciasc'aasp=d=12-e12e254894619+*";
+			const char *realsum = "2e537c05b009d2d64db2eb597191aa51";
+			const char *p = realsum;
+			char buf[3];
+			uint8_t realhash[16];
+			uint8_t hash[16];
+			// clean before
+			FileSystem_deleteFile("testfile");
+			// write
+			h = FileSystem_openFile("testfile", true);
+			if (h == NULL) { err(); return 1; }
+			rc = FileSystem_writeFile(h, (uint8_t *)text, (int)strlen(text));
+			if (rc != strlen(text)) { err(); return 1; }
+			// close
+			FileSystem_closeFile(h);
+			// compute hash
+			rc = (int)FileSystem_getFileMd5Hash("testfile", hash);
+			if (rc == 0) { err(); return 1; }
+			// check
+			for (int i = 0; i < 16; ++i) {
+				buf[0] = p[0];
+				buf[1] = p[1];
+				buf[2] = '\0';
+				realhash[i] = (uint8_t)strtoul(buf, NULL, 16);
+				if (realhash[i] != hash[i]) { err(); return 1; }
+				p+=2;
+			}			
 			return 0;
 		} break;
 	}

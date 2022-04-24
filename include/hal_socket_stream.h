@@ -1,6 +1,7 @@
 #ifndef HAL_SOCKET_STREAM_H
 #define HAL_SOCKET_STREAM_H
 
+
 #include "hal_base.h"
 
 

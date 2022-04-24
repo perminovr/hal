@@ -6,6 +6,7 @@
 #endif
 
 #include "hal_socket_dgram.h"
+#include "hal_utils.h"
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
@@ -48,7 +49,6 @@ struct sDgramSocket {
 
 
 static bool prepareSocketAddress(const char *address, uint16_t port, struct sockaddr_in *sockaddr);
-static char *inet_paddr(in_addr_t in, char *out);
 
 
 static inline void setSocketNonBlocking(int fd)
@@ -120,11 +120,10 @@ bool UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *ifac
 	if (self == NULL || ip == NULL || iface == NULL) return false;
 	struct ip_mreqn imreqn;
 	struct ifreq ifr;
+	memset(&ifr, 0, sizeof(ifr));
 	imreqn.imr_multiaddr.s_addr = inet_addr(ip);
 	imreqn.imr_address.s_addr = htonl(INADDR_ANY);
-	imreqn.imr_ifindex = if_nametoindex(iface);
-	memset(&ifr, 0, sizeof(ifr));
-	strcpy(ifr.ifr_name, iface);
+	NetwHlpr_interfaceInfo(iface, &imreqn.imr_ifindex, (char *)ifr.ifr_name, NULL, NULL);
 	if (setsockopt(self->fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &imreqn, sizeof(struct ip_mreqn)) < 0) {
 		return false;
 	}
@@ -193,20 +192,20 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 	if (fd < 0) return NULL;
 
 	int idx;
+	char ifname[32];
 	int sockopt;
 	struct packet_mreq mreq;
 	DgramSocket self;
 
-	bzero(&mreq, sizeof(struct packet_mreq));
-
-	idx = (int)if_nametoindex(iface);
+	memset(&mreq, 0, sizeof(struct packet_mreq));
+	NetwHlpr_interfaceInfo(iface, &idx, ifname, NULL, NULL);
 
 	mreq.mr_ifindex = idx;
 	mreq.mr_type = PACKET_MR_PROMISC;
 
 	sockopt = 1;
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) goto exit_error;
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, iface, IFNAMSIZ-1) < 0) goto exit_error;
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, ifname, IFNAMSIZ-1) < 0) goto exit_error;
 	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) goto exit_error;
 
 	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
@@ -247,28 +246,12 @@ void EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *ds
 	header += 2;
 }
 
-bool EtherDgramSocket_getInterfaceMACAddress(const char *iface, uint8_t *addr)
-{
-	if (iface == NULL || addr == NULL) return false;
-	int sock = socket(PF_INET, SOCK_DGRAM, 0);
-	if (sock >= 0) {
-		struct ifreq ifr;
-		bzero(&ifr, sizeof(struct ifreq));
-		strncpy(ifr.ifr_name, iface, IFNAMSIZ-1);
-		ioctl(sock, SIOCGIFHWADDR, &ifr);
-		close(sock);
-		memcpy(addr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
-		return true;
-	}
-	return false;
-}
-
-uint8_t *EtherDgramSocket_getSocketMACAddress(DgramSocket self, uint8_t *addr)
+uint8_t *EtherDgramSocket_getMACAddress(DgramSocket self, uint8_t *addr)
 {
 	if (self == NULL || addr == NULL) return NULL;
 	if (self->fd >= 0) {
 		struct ifreq iface;
-		bzero(&iface, sizeof(struct ifreq));
+		memset(&iface, 0, sizeof(struct ifreq));
 		if_indextoname(self->ifidx, iface.ifr_name);
 		ioctl(self->fd, SIOCGIFHWADDR, &iface);
 		memcpy(addr, iface.ifr_hwaddr.sa_data, ETH_ALEN);
@@ -293,7 +276,7 @@ bool DgramSocket_reset(DgramSocket self)
 	return false;
 }
 
-void DgramSocket_close(DgramSocket self) // hal internal use only
+HAL_INTERNAL void DgramSocket_close(DgramSocket self)
 {
 	if (self == NULL) return;
 	if (self->fd >= 0) {
@@ -337,7 +320,7 @@ static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *bu
 			switch (self->domain) {
 				case AF_INET: {
 					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-					inet_paddr(htonl(paddr->sin_addr.s_addr), addr->ip);
+					Hal_ipv4BinToStr(htonl(paddr->sin_addr.s_addr), addr->ip);
 					addr->port = htons(paddr->sin_port);
 				} break;
 				case AF_UNIX: {
@@ -494,19 +477,6 @@ static bool prepareSocketAddress(const char *address, uint16_t port, struct sock
 	sockaddr->sin_port = htons(port);
 
 	return retVal;
-}
-
-static char *inet_paddr(in_addr_t in, char *out)
-{
-	char *ret = 0;
-	union { uint32_t u32; uint8_t b[4]; } addr;
-	addr.u32 = in;
-	if ( sprintf(out, "%hhu.%hhu.%hhu.%hhu",
-			addr.b[3], addr.b[2], addr.b[1], addr.b[0]) == 4 )
-	{
-		ret = out;
-	}
-	return ret;
 }
 
 

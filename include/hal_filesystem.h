@@ -148,12 +148,13 @@ HAL_API bool
 FileSystem_copyFile(const char *filename, const char *newFilename);
 
 /**
- * \brief copy a file with opened hadlers
+ * \brief copy a file with opened hadler. 
+ * The handler will be closed after the process
  *
  * \return true on success, false on error
  */
 HAL_API bool
-FileSystem_copyFileH(FileHandle fhs, FileHandle fhd);
+FileSystem_copyFileH(const char *filename, FileHandle fhd);
 
 /**
  * \brief copy a file
