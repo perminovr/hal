@@ -70,7 +70,6 @@ add_test(test_fs_dir test_fs 4)
 add_test(test_fs_move test_fs 5)
 add_test(test_fs_crtin test_fs 6)
 add_test(test_fs_copy test_fs 7)
-add_test(test_fs_copyh test_fs 8)
 add_test(test_fs_md5 test_fs 9)
 
 add_test(test_timer_to test_timer 1)

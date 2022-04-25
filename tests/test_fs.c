@@ -185,42 +185,6 @@ int main(int argc, const char **argv)
 			if (rc == 0) { err(); return 1; }
 			return 0;
 		} break;
-		case 8: { // file copy h
-			// clean before
-			FileSystem_deleteFile("testfile");
-			// write
-			h = FileSystem_openFile("testfile", true);
-			if (h == NULL) { err(); return 1; }
-			for (int i = 0; i < 65535; ++i) {
-				buf[i] = (char)i;
-			}
-			rc = FileSystem_writeFile(h, buf, 65535);
-			if (rc != 65535) { err(); return 1; }
-			// close
-			FileSystem_closeFile(h);
-			// copy
-			char fullpath[256];
-			FileHandle h2 = FileSystem_createFileIn(".", NULL, fullpath);
-			if (h2 == NULL) { err(); return 1; }
-			rc = (int)FileSystem_copyFileH("testfile", h2);
-			if (rc == 0) { err(); return 1; }
-			// reopen
-			h2 = FileSystem_openFile(fullpath, false);
-			// read
-			memset(buf, 0, 65535);
-			rc = FileSystem_readFile(h2, buf, 65535); printf("%d\n", rc);
-			if (rc != 65535) { err(); return 1; }
-			for (int i = 0; i < 65535; ++i) {
-				if (buf[i] != (char)i) { err(); return 1; }
-			}
-			// clean
-			FileSystem_closeFile(h2);
-			rc = (int)FileSystem_deleteFile("testfile");
-			if (rc == 0) { err(); return 1; }
-			rc = (int)FileSystem_deleteFile(fullpath);
-			if (rc == 0) { err(); return 1; }
-			return 0;
-		} break;
 		case 9: { // file md5
 			const char *text = "ljalsml;masldjdh1u876tr19oghqbv szc9j9\naskc9j0asjciasc'aasp=d=12-e12e254894619+*";
 			const char *realsum = "2e537c05b009d2d64db2eb597191aa51";
@@ -248,7 +212,7 @@ int main(int argc, const char **argv)
 				realhash[i] = (uint8_t)strtoul(buf, NULL, 16);
 				if (realhash[i] != hash[i]) { err(); return 1; }
 				p+=2;
-			}			
+			}
 			return 0;
 		} break;
 	}

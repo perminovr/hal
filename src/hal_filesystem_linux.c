@@ -79,7 +79,7 @@ bool FileSystem_renameFile(const char *oldFilename, const char *newFilename)
 	return (rename(oldFilename, newFilename) == 0)? true : false;
 }
 
-bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
+static bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 {
 	if (!filename || !fhd) return false;
 	int rc, rc2;
@@ -93,10 +93,10 @@ bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 			if (rc2 != rc) {
 				FileSystem_closeFile(fhs);
 				FileSystem_closeFile(fhd);
-				return false; 
+				return false;
 			}
 		}
-	} while (rc > 0);	
+	} while (rc > 0);
 	FileSystem_closeFile(fhs);
 	FileSystem_closeFile(fhd);
 	return true;
@@ -104,7 +104,6 @@ bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 
 bool FileSystem_copyFile(const char *filename, const char *newFilename)
 {
-	bool ret = false;
 	if (!filename || !newFilename) return false;
 	FileSystem_deleteFile(newFilename);
 	FileHandle fhd = FileSystem_openFile(newFilename, true);

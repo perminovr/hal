@@ -30,7 +30,7 @@ FileHandle FileSystem_createFileIn(const char *path, char *filename, char *fullp
 	char buf[512];
 	if (!path) return NULL;
 	if (GetTempFileNameA((LPCSTR)path, (LPCSTR)"tmp", 0, (LPSTR)buf) == 0) return NULL;
-	FileSystem_deleteFile(buf);	
+	FileSystem_deleteFile(buf);
 	if (filename) { _splitpath(buf, NULL, NULL, filename, NULL); }
 	if (fullpath) { strcpy(fullpath, buf); }
 	return FileSystem_openFile(buf, true);
@@ -73,7 +73,7 @@ bool FileSystem_renameFile(const char *oldFilename, const char *newFilename)
 	return (rename(oldFilename, newFilename) == 0)? true : false;
 }
 
-bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
+static bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 {
 	if (!filename || !fhd) return false;
 	int rc, rc2;
@@ -87,10 +87,10 @@ bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 			if (rc2 != rc) {
 				FileSystem_closeFile(fhs);
 				FileSystem_closeFile(fhd);
-				return false; 
+				return false;
 			}
 		}
-	} while (rc > 0);	
+	} while (rc > 0);
 	FileSystem_closeFile(fhs);
 	FileSystem_closeFile(fhd);
 	return true;
@@ -98,7 +98,6 @@ bool FileSystem_copyFileH(const char *filename, FileHandle fhd)
 
 bool FileSystem_copyFile(const char *filename, const char *newFilename)
 {
-	bool ret = false;
 	if (!filename || !newFilename) return false;
 	FileSystem_deleteFile(newFilename);
 	FileHandle fhd = FileSystem_openFile(newFilename, true);
@@ -245,12 +244,12 @@ bool FileSystem_deleteDirectory(const char *directoryName)
 	char *p, *fullPath = (char *)calloc(1, 512);
 	sprintf(fullPath, "%s\\", directoryName);
 	p = fullPath + strlen(fullPath);
-	
+
 	while ( (f = FileSystem_readDirectory(dh, &isdir)) ) {
 		if ( strcmp(f, ".") == 0 ) continue;
 		if ( strcmp(f, "..") == 0 ) continue;
 		strcpy(p, f);
-		rc = (isdir)? 
+		rc = (isdir)?
 			FileSystem_deleteDirectory(fullPath) : FileSystem_deleteFile(fullPath);
 		if (rc == false) {
 			goto toexit;
