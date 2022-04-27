@@ -87,7 +87,7 @@ static int mnltalk_route_cb(const struct nlmsghdr *nlh, void *data)
 {
 	Netsys self = (Netsys)data;
 	struct nlattr *tb[RTA_MAX+1] = {};
-	struct rtmsg *rtm = mnl_nlmsg_get_payload(nlh);
+	struct rtmsg *rtm = (struct rtmsg *)mnl_nlmsg_get_payload(nlh);
 	struct in_addr *inaddr;
 	NetSysRoute_t *route;
 
@@ -108,16 +108,16 @@ static int mnltalk_route_cb(const struct nlmsghdr *nlh, void *data)
 
 		memset(route, 0, sizeof(NetSysRoute_t));
 		if (tb[RTA_DST]) {
-			inaddr = mnl_attr_get_payload(tb[RTA_DST]);
+			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_DST]);
 			route->dstip = htonl(inaddr->s_addr);
 			route->dstpfx = rtm->rtm_dst_len;
 		}
 		if (tb[RTA_PREFSRC]) {
-			inaddr = mnl_attr_get_payload(tb[RTA_PREFSRC]);
+			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_PREFSRC]);
 			route->srcip = htonl(inaddr->s_addr);
 		}
 		if (tb[RTA_GATEWAY]) {
-			inaddr = mnl_attr_get_payload(tb[RTA_GATEWAY]);
+			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_GATEWAY]);
 			route->gwip = htonl(inaddr->s_addr);
 		}
 		if (tb[RTA_PRIORITY]) {
@@ -131,7 +131,7 @@ static int mnltalk_route_cb(const struct nlmsghdr *nlh, void *data)
 
 static int ipaddr_attr_cb(const struct nlattr *attr, void *data)
 {
-	const struct nlattr **tb = data;
+	const struct nlattr **tb = (const struct nlattr **)data;
 	int type = mnl_attr_get_type(attr);
 	if (mnl_attr_type_valid(attr, IFA_MAX) < 0)
 		return MNL_CB_OK; /* skip unsupported attribute in user-space */
@@ -151,11 +151,11 @@ static int mnltalk_ipaddr_cb(const struct nlmsghdr *nlh, void *data)
 {
 	Netsys self = (Netsys)data;
 	struct nlattr *tb[IFA_MAX + 1] = {};
-	struct ifaddrmsg *ifa = mnl_nlmsg_get_payload(nlh);
+	struct ifaddrmsg *ifa = (struct ifaddrmsg *)mnl_nlmsg_get_payload(nlh);
 	struct in_addr *inaddr;
 	NetSysIpAddr_t *ipaddr;
 
-	if (ifa->ifa_family == AF_INET && ifa->ifa_index == self->searchmem.idx) {
+	if (ifa->ifa_family == AF_INET && (int)ifa->ifa_index == self->searchmem.idx) {
 		mnl_attr_parse(nlh, sizeof(*ifa), ipaddr_attr_cb, tb);
 
 		if (!tb[IFA_ADDRESS])
@@ -164,7 +164,7 @@ static int mnltalk_ipaddr_cb(const struct nlmsghdr *nlh, void *data)
 		ipaddr = &self->searchmem.ipaddr.self[self->searchmem.ipaddr.it++];
 		if (self->searchmem.ipaddr.it >= self->searchmem.ipaddr.max) return MNL_CB_OK;
 		{
-			inaddr = mnl_attr_get_payload(tb[IFA_ADDRESS]);
+			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[IFA_ADDRESS]);
 			ipaddr->ip = htonl(inaddr->s_addr);
 			ipaddr->pfx = ifa->ifa_prefixlen;
 		}
@@ -218,7 +218,7 @@ static bool Netsys_doIpRoute(Netsys self,
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type	= action;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE | NLM_F_ACK;
-	rtm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtmsg));
+	rtm = (struct rtmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtmsg));
 	rtm->rtm_family = AF_INET;
 	rtm->rtm_src_len = 0;
 	rtm->rtm_tos = 0;
@@ -283,7 +283,7 @@ bool Netsys_addIpAddr(Netsys self, const char *iface,
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type	= RTM_NEWADDR;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE | NLM_F_ACK;
-	ifm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifaddrmsg));
+	ifm = (struct ifaddrmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifaddrmsg));
 	ifm->ifa_family = AF_INET;
 	ifm->ifa_prefixlen = NetwHlpr_maskToPrefix(ipmask);
 	ifm->ifa_flags = IFA_F_PERMANENT;
@@ -312,7 +312,7 @@ bool Netsys_delIpAddr(Netsys self, const char *iface,
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type	= RTM_DELADDR;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE | NLM_F_ACK;
-	ifm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifaddrmsg));
+	ifm = (struct ifaddrmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifaddrmsg));
 	ifm->ifa_family = AF_INET;
 	ifm->ifa_prefixlen = NetwHlpr_maskToPrefix(ipmask);
 	ifm->ifa_flags = IFA_F_PERMANENT;
@@ -337,7 +337,7 @@ bool Netsys_controlLink(Netsys self, const char *iface, bool up, bool promisc)
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type	= RTM_NEWLINK;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_ACK;
-	ifm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifinfomsg));
+	ifm = (struct ifinfomsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifinfomsg));
 	ifm->ifi_family = AF_UNSPEC;
 	ifm->ifi_change |= IFF_UP|IFF_PROMISC;
 	if (up) {
@@ -369,7 +369,7 @@ bool Netsys_findAllRoutes(Netsys self, const char *iface, NetSysRoute_t *out, in
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type = RTM_GETROUTE;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-	rtm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtmsg));
+	rtm = (struct rtmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtmsg));
 	rtm->rtm_family = AF_INET;
 	self->searchmem.route.it = 0;
 	self->searchmem.route.max = *size;
@@ -394,7 +394,7 @@ bool Netsys_findAllIpAddrs(Netsys self, const char *iface, NetSysIpAddr_t *out, 
 	nlh = mnl_nlmsg_put_header(self->buf);
 	nlh->nlmsg_type	= RTM_GETADDR;
 	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
-	rt = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
+	rt = (struct rtgenmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
 	rt->rtgen_family = AF_INET;
 	self->searchmem.ipaddr.it = 0;
 	self->searchmem.ipaddr.max = *size;
@@ -411,10 +411,6 @@ bool Netsys_cleanupIface(Netsys self, const char *iface)
 	if (!iface) return false;
 	if (!NetwHlpr_interfaceInfo(iface, &self->searchmem.idx, NULL, NULL, NULL)) return false;
 
-	struct nlmsghdr *nlh;
-	struct rtmsg *rtm;
-	struct rtgenmsg *rt;
-	bool ret;
 	char destIP[16];
 	char destMask[16];
 	char srcIP[16];
@@ -478,12 +474,12 @@ Netsys Netsys_create(void)
 
 	setSocketNonBlocking(mnl_socket_get_fd(nl));
 
-	buf = calloc(1, MNL_SOCKET_BUFFER_SIZE);
+	buf = (char *)calloc(1, MNL_SOCKET_BUFFER_SIZE);
 	if (!buf) {
 		goto nl_exit;
 	}
 
-	self = calloc(1, sizeof(struct sNetsys));
+	self = (Netsys)calloc(1, sizeof(struct sNetsys));
 	if (self) {
 		self->nl = nl;
 		self->portid = mnl_socket_get_portid(nl);
