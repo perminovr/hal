@@ -264,7 +264,7 @@ uint8_t NetwHlpr_maskToPrefix(const char *strMask)
 	if (strMask) {
 		if (strlen(strMask) <= 2) {
 			prefix = 32;
-			sscanf(strMask, "%u", &prefix);
+			prefix = (uint32_t)strtoul(strMask, NULL, 10);
 			mask = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF;
 			mask = htonl(mask);
 		} else {

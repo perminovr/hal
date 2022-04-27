@@ -5,6 +5,9 @@ project(project0)
 set(HAL_PCAP_SUPPORTED ON)
 set(NPCAPLIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/npcap)
 
+# linux netsys supporting
+set(HAL_LIBMNL_SUPPORTED ON)
+
 # enable hal tests
 enable_testing()
 set(HAL_TESTS ON)

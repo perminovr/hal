@@ -1,6 +1,7 @@
 project (libhal)
 
 # option(HAL_PCAP_SUPPORTED "Ethernet requires pcap lib" OFF)
+# option(HAL_LIBMNL_SUPPORTED "Linux netsys requires libmnl, libmnl-dev" OFF)
 # option(HAL_TESTS "Hal tests" OFF)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -33,7 +34,12 @@ if(WIN32)
 		_CRT_SECURE_NO_WARNINGS
 		_WINSOCK_DEPRECATED_NO_WARNING
 	)
-else()
+endif()
+if(UNIX)
+	if(HAL_LIBMNL_SUPPORTED)
+		target_link_libraries(libhal PUBLIC mnl)
+		target_compile_definitions(libhal PRIVATE HAL_LIBMNL_SUPPORTED)
+	endif()
 	target_link_libraries(libhal PUBLIC pthread)
 endif()
 
