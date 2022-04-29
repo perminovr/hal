@@ -164,6 +164,7 @@ bool DgramSocket_reset(DgramSocket self)
 		closesocket(self->s);
 		self->s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (self->s != INVALID_SOCKET) {
+			setSocketNonBlocking(self->s);
 			return true;
 		}
 	}
@@ -201,7 +202,7 @@ void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 	if (self->domain == (int)ST_Local) {
 		memcpy(addr, &self->localremote, sizeof(union uDgramSocketAddress));
 	} else {
-		memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));		
+		memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));
 	}
 }
 
@@ -273,7 +274,7 @@ int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 	struct sockaddr_storage saddr;
 	socklen_t addr_size = sizeof(struct sockaddr_in);
 	struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-	memset(&saddr, 0, sizeof(struct sockaddr_storage));	
+	memset(&saddr, 0, sizeof(struct sockaddr_storage));
 	inet_pton(AF_INET, addr->ip, &paddr->sin_addr.s_addr);
 	paddr->sin_family = AF_INET;
 	paddr->sin_port = htons(addr->port);

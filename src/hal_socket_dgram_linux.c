@@ -181,6 +181,19 @@ void LocalDgramSocket_unlinkAddress(const char *address)
 }
 
 
+static bool EtherDgramSocket_bind(int fd, int idx, const char *ifacename)
+{
+	struct packet_mreq mreq;
+	int sockopt = 1;
+	memset(&mreq, 0, sizeof(struct packet_mreq));
+	mreq.mr_ifindex = idx;
+	mreq.mr_type = PACKET_MR_PROMISC;
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) return false;
+	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, ifacename, IFNAMSIZ-1) < 0) return false;
+	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) return false;
+	return true;
+}
+
 DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 {
 	if (iface == NULL) return NULL;
@@ -193,20 +206,10 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 
 	int idx;
 	char ifname[32];
-	int sockopt;
-	struct packet_mreq mreq;
 	DgramSocket self;
 
-	memset(&mreq, 0, sizeof(struct packet_mreq));
-	NetwHlpr_interfaceInfo(iface, &idx, ifname, NULL, NULL);
-
-	mreq.mr_ifindex = idx;
-	mreq.mr_type = PACKET_MR_PROMISC;
-
-	sockopt = 1;
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) goto exit_error;
-	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, ifname, IFNAMSIZ-1) < 0) goto exit_error;
-	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) goto exit_error;
+	if (NetwHlpr_interfaceInfo(iface, &idx, ifname, NULL, NULL) == false) goto exit_error;
+	if (EtherDgramSocket_bind(fd, idx, ifname) == false) goto exit_error;
 
 	self = (DgramSocket)calloc(1, sizeof(struct sDgramSocket));
 	if (self) {
@@ -264,12 +267,23 @@ uint8_t *EtherDgramSocket_getMACAddress(DgramSocket self, uint8_t *addr)
 bool DgramSocket_reset(DgramSocket self)
 {
 	if (self == NULL) return false;
-	if (self->domain != AF_INET) return false;
+	if (self->domain == AF_UNIX) return false;
 	if (self->fd >= 0) {
 		close(self->fd);
 		uint16_t protocol = (self->protocol != -1)? (uint16_t)self->protocol : 0;
-		self->fd = socket(self->domain, SOCK_DGRAM, protocol);
+		int type = (self->domain == AF_PACKET)? SOCK_RAW : SOCK_DGRAM;
+		self->fd = socket(self->domain, type, protocol);
 		if (self->fd >= 0) {
+			if (self->domain == AF_PACKET) {
+				char iface[32];
+				char ifname[32];
+				sprintf(iface, "%d", self->ifidx);
+				NetwHlpr_interfaceInfo(iface, NULL, ifname, NULL, NULL);
+				if (EtherDgramSocket_bind(self->fd, self->ifidx, ifname) == false) {
+					return false;
+				}
+			}
+			setSocketNonBlocking(self->fd);
 			return true;
 		}
 	}
