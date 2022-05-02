@@ -35,9 +35,13 @@ HAL_INTERNAL int EtherDgramSocket_readFrom(DgramSocket self, DgramSocketAddress 
 HAL_INTERNAL int EtherDgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size);
 HAL_INTERNAL int EtherDgramSocket_read(DgramSocket self, uint8_t *buf, int size);
 HAL_INTERNAL int EtherDgramSocket_write(DgramSocket self, const uint8_t *buf, int size);
-HAL_INTERNAL int EtherDgramSocket_readAvailable(DgramSocket self, bool fromRemote, uint8_t *buf);
+HAL_INTERNAL int EtherDgramSocket_readAvailable(DgramSocket self, bool fromRemote);
 HAL_INTERNAL void EtherDgramSocket_destroy(DgramSocket self);
 HAL_INTERNAL unidesc EtherDgramSocket_getDescriptor(DgramSocket self);
+HAL_INTERNAL bool EtherDgramSocket_reset(DgramSocket self);
+HAL_INTERNAL void EtherDgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr);
+HAL_INTERNAL void EtherDgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr);
+HAL_INTERNAL int EtherDgramSocket_peek(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size);
 
 
 static inline void setSocketNonBlocking(SOCKET s)
@@ -156,10 +160,8 @@ DgramSocket EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter)
 }
 
 
-bool DgramSocket_reset(DgramSocket self)
+static bool DgramSocket_reset0(DgramSocket self)
 {
-	if (self == NULL) return false;
-	if (self->domain != (int)ST_Inet) return false;
 	if (self->s != INVALID_SOCKET) {
 		closesocket(self->s);
 		self->s = socket(AF_INET, SOCK_DGRAM, 0);
@@ -171,38 +173,72 @@ bool DgramSocket_reset(DgramSocket self)
 	return false;
 }
 
+bool DgramSocket_reset(DgramSocket self)
+{
+	if (self == NULL) return false;
+	switch (self->domain) {
+		case (int)ST_Inet: {
+			return DgramSocket_reset0(self);
+		} break;
+		case (int)ST_Ether: {
+			return EtherDgramSocket_reset(self);
+		} break;
+		default: break;
+	}
+	return false;
+}
+
 HAL_INTERNAL void DgramSocket_close(DgramSocket self)
 {
 	if (self == NULL) return;
-	if (self->domain == (int)ST_Ether) {
-		EtherDgramSocket_close(self);
-		return;
-	}
-	if (self->s != INVALID_SOCKET) {
-		closesocket(self->s);
-		self->s = INVALID_SOCKET;
+	switch (self->domain) {
+		case (int)ST_Local:
+		case (int)ST_Inet: {
+			if (self->s != INVALID_SOCKET) {
+				closesocket(self->s);
+				self->s = INVALID_SOCKET;
+			}
+		} break;
+		case (int)ST_Ether: {
+			EtherDgramSocket_close(self);
+		} break;
+		default: break;
 	}
 }
 
 void DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr)
 {
 	if (self == NULL || addr == NULL) return;
-	if (self->domain == (int)ST_Local) {
-		memcpy(&self->localremote, addr, sizeof(union uDgramSocketAddress));
-		self->remote.port = NetwHlpr_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
-		strcpy(self->remote.ip, HAL_LOCAL_SOCK_ADDR);
-	} else {
-		memcpy(&self->remote, addr, sizeof(union uDgramSocketAddress));
+	switch (self->domain) {
+		case (int)ST_Inet: {
+			memcpy(&self->remote, addr, sizeof(union uDgramSocketAddress));
+		} break; 
+		case (int)ST_Local: {
+			memcpy(&self->localremote, addr, sizeof(union uDgramSocketAddress));
+			self->remote.port = NetwHlpr_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
+			strcpy(self->remote.ip, HAL_LOCAL_SOCK_ADDR);
+		} break;
+		case (int)ST_Ether: {
+			EtherDgramSocket_setRemote(self, addr);
+		} break;
+		default: break;
 	}
 }
 
 void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 {
 	if (self == NULL || addr == NULL) return;
-	if (self->domain == (int)ST_Local) {
-		memcpy(addr, &self->localremote, sizeof(union uDgramSocketAddress));
-	} else {
-		memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));
+	switch (self->domain) {
+		case (int)ST_Inet: {
+			memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));
+		} break; 
+		case (int)ST_Local: {
+			memcpy(addr, &self->localremote, sizeof(union uDgramSocketAddress));
+		} break;
+		case (int)ST_Ether: {
+			EtherDgramSocket_getRemote(self, addr);
+		} break;
+		default: break;
 	}
 }
 
@@ -231,12 +267,8 @@ int DgramSocket_readFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *buf
 	return socketReadFrom(self, addr, buf, size, 0);
 }
 
-int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size)
+static int DgramSocket_writeTo0(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size)
 {
-	if (self == NULL || addr == NULL || buf == NULL) return -1;
-	if (self->domain == (int)ST_Ether) {
-		return EtherDgramSocket_writeTo(self, addr, buf, size);
-	}
 	struct sockaddr_storage saddr;
 	socklen_t addr_size = sizeof(struct sockaddr_in);
 	struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
@@ -253,6 +285,15 @@ int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const u
 	return sendto(self->s, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
 }
 
+int DgramSocket_writeTo(DgramSocket self, const DgramSocketAddress addr, const uint8_t *buf, int size)
+{
+	if (self == NULL || addr == NULL || buf == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_writeTo(self, addr, buf, size);
+	}
+	return DgramSocket_writeTo0(self, addr, buf, size);
+}
+
 int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
 {
 	if (self == NULL || buf == NULL) return -1;
@@ -264,12 +305,8 @@ int DgramSocket_read(DgramSocket self, uint8_t *buf, int size)
 	return socketReadFrom(self, NULL, buf, size, 0);
 }
 
-int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
+static int DgramSocket_write0(DgramSocket self, const uint8_t *buf, int size)
 {
-	if (self == NULL || buf == NULL) return -1;
-	if (self->domain == (int)ST_Ether) {
-		return EtherDgramSocket_write(self, buf, size);
-	}
 	DgramSocketAddress addr = &self->remote;
 	struct sockaddr_storage saddr;
 	socklen_t addr_size = sizeof(struct sockaddr_in);
@@ -281,17 +318,20 @@ int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 	return sendto(self->s, buf, size, 0, (const struct sockaddr *)&saddr, addr_size);
 }
 
-int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
+int DgramSocket_write(DgramSocket self, const uint8_t *buf, int size)
 {
-	if (self == NULL) return -1;
+	if (self == NULL || buf == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_write(self, buf, size);
+	}
+	return DgramSocket_write0(self, buf, size);
+}
+
+static int DgramSocket_readAvailable0(DgramSocket self, bool fromRemote)
+{
 	uint8_t buf[65535]; // WSAEMSGSIZE
 	union uDgramSocketAddress source;
 	int ret, rc;
-
-	if (self->domain == (int)ST_Ether) {
-		return EtherDgramSocket_readAvailable(self, fromRemote, buf);
-	}
-
 	while (1) {
 		ret = getSocketAvailableToRead(self->s);
 		if (ret <= 0) return ret;
@@ -307,6 +347,24 @@ int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 			return -1;
 		}
 	}
+}
+
+int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
+{
+	if (self == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_readAvailable(self, fromRemote);
+	}
+	return DgramSocket_readAvailable0(self, fromRemote);
+}
+
+int DgramSocket_peek(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size)
+{
+	if (self == NULL || addr == NULL || buf == NULL) return -1;
+	if (self->domain == (int)ST_Ether) {
+		return EtherDgramSocket_peek(self, addr, buf, size);
+	}
+	return socketReadFrom(self, addr, buf, size, MSG_PEEK);
 }
 
 void DgramSocket_destroy(DgramSocket self)

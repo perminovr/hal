@@ -8,6 +8,7 @@
 #include <asm/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <net/if_arp.h>
 
 #include <libmnl/libmnl.h>
 #include <linux/if.h>
@@ -42,6 +43,12 @@ struct sNetsys {
 			int it;
 			int max;
 		} ipaddr;
+		struct {
+			NetSysIface_t *self;
+			int it;
+			int max;
+			uint32_t ufilter;
+		} link;
 	} searchmem;
 };
 
@@ -169,6 +176,42 @@ static int mnltalk_ipaddr_cb(const struct nlmsghdr *nlh, void *data)
 			ipaddr->pfx = ifa->ifa_prefixlen;
 		}
 	}
+
+	return MNL_CB_OK;
+}
+
+static int mnltalk_link_cb(const struct nlmsghdr *nlh, void *data)
+{
+	Netsys self = (Netsys)data;
+	struct nlattr *tb[IFLA_MAX+1] = {};
+	struct ifinfomsg *ifm = (struct ifinfomsg *)mnl_nlmsg_get_payload(nlh);
+	NetSysIface_t *link;
+
+	link = &self->searchmem.link.self[self->searchmem.link.it++];
+	if (self->searchmem.link.it >= self->searchmem.link.max) return MNL_CB_OK;
+
+	#define addIfaceToOut(t) {\
+		link->type = t;\
+		sprintf(link->idx, "%d", ifm->ifi_index);\
+		return MNL_CB_OK;\
+	}
+	if (self->searchmem.link.ufilter == (uint32_t)NSIT_Any) {
+		if (ifm->ifi_type == ARPHRD_ETHER || ifm->ifi_type == ARPHRD_IEEE802)
+			addIfaceToOut(NSIT_Ether);
+		if (ifm->ifi_type == ARPHRD_IEEE80211)
+			addIfaceToOut(NSIT_Wifi);
+		if (ifm->ifi_type == ARPHRD_LOOPBACK)
+			addIfaceToOut(NSIT_Loopback);
+		addIfaceToOut(NSIT_Other);
+	}
+	if ((ifm->ifi_type == ARPHRD_ETHER || ifm->ifi_type == ARPHRD_IEEE802) && (self->searchmem.link.ufilter & (uint32_t)NSIT_Ether))
+		addIfaceToOut(NSIT_Ether);
+	if (ifm->ifi_type == ARPHRD_IEEE80211 && (self->searchmem.link.ufilter & (uint32_t)NSIT_Wifi))
+		addIfaceToOut(NSIT_Wifi);
+	if (ifm->ifi_type == ARPHRD_LOOPBACK && (self->searchmem.link.ufilter & (uint32_t)NSIT_Loopback))
+		addIfaceToOut(NSIT_Loopback);
+	if ((self->searchmem.link.ufilter & (uint32_t)NSIT_Other))
+		addIfaceToOut(NSIT_Other);
 
 	return MNL_CB_OK;
 }
@@ -405,6 +448,30 @@ bool Netsys_findAllIpAddrs(Netsys self, const char *iface, NetSysIpAddr_t *out, 
 }
 
 
+bool Netsys_findAllIfaces(Netsys self, NetSysIfaceType_e filter, NetSysIface_t *out, int *size)
+{
+	if (!self) return false;
+	if (!out || !size || *size <= 0) return false;
+
+	struct nlmsghdr *nlh;
+	struct rtgenmsg *rt;
+	bool ret;
+
+	nlh = mnl_nlmsg_put_header(self->buf);
+	nlh->nlmsg_type	= RTM_GETLINK;
+	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+	rt = (struct rtgenmsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtgenmsg));
+	rt->rtgen_family = AF_PACKET;
+	self->searchmem.link.it = 0;
+	self->searchmem.link.max = *size;
+	self->searchmem.link.self = out;
+	self->searchmem.link.ufilter = (uint32_t)filter;
+	ret = mnltalk(self, nlh, mnltalk_link_cb);
+	*size = self->searchmem.link.it;
+	return ret;
+}
+
+
 bool Netsys_cleanupIface(Netsys self, const char *iface)
 {
 	if (!self) return false;
@@ -541,6 +608,10 @@ Netsys_findAllRoutes(Netsys self, const char *iface, NetSysRoute_t *out, int *si
 
 bool
 Netsys_findAllIpAddrs(Netsys self, const char *iface, NetSysIpAddr_t *out, int *size)
+{ return false; }
+
+bool 
+Netsys_findAllIfaces(Netsys self, NetSysIfaceType_e filter, NetSysIface_t *out, int *size)
 { return false; }
 
 bool

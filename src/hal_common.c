@@ -284,6 +284,7 @@ uint8_t NetwHlpr_maskToPrefix(const char *strMask)
 
 char *NetwHlpr_prefixToMask(int prefix, char *buf)
 {
+	if (!buf) return NULL;
 	if (prefix >= 0 && prefix <= 32) {
 		uint32_t mask = prefix ? (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF : 0;
 		mask = htonl(mask);
@@ -309,12 +310,14 @@ uint32_t NetwHlpr_broadcast(const char *ip, uint8_t prefix)
 
 uint32_t NetwHlpr_subnet(const char *ip, uint8_t prefix)
 {
+	if (!ip) return 0;
 	uint32_t mask = (0xFFFFFFFF << (32-prefix));
 	return htonl(htonl(inet_addr(ip)) & mask);
 }
 
 uint16_t NetwHlpr_generatePort(const char *name, uint16_t min, uint16_t max)
 {
+	if (!name) return 0;
 	const uint16_t table[256] = {
 		0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
 		0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
@@ -378,11 +381,13 @@ uint16_t NetwHlpr_generatePort(const char *name, uint16_t min, uint16_t max)
 
 uint32_t Hal_ipv4StrToBin(const char *ip)
 {
+	if (!ip) return 0;
 	return (uint32_t)inet_addr(ip);
 }
 
 char *Hal_ipv4BinToStr(uint32_t in, char *out)
 {
+	if (!out) return NULL;
 	union { uint32_t u32; uint8_t b[4]; } addr;
 	addr.u32 = in;
 	if ( sprintf(out, "%hhu.%hhu.%hhu.%hhu",

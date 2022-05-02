@@ -277,6 +277,19 @@ HAL_API int
 DgramSocket_readAvailable(DgramSocket self, bool fromRemote);
 
 /**
+ * \brief Peek message from the socket
+ *
+ * \param self the socket instance
+ * \param addr address of data source (protocol specific).
+ * \param buf the buffer where the read bytes are copied to
+ * \param size the maximum number of bytes to read (size of the provided buffer)
+ * 
+ * \return the number of bytes peeked or -1 if an error occurred
+ */
+HAL_API int
+DgramSocket_peek(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size);
+
+/**
  * \brief destroy a socket (after close the socket)
  *
  * This function shall close the connection (if one is established) and free all

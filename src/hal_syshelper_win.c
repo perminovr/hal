@@ -110,9 +110,7 @@ static void *ShDescStream_loop(void *p)
 		(HANDLE)(ifd),
 		(HANDLE)(self->fd->h.u64),
 	};
-	DWORD rc, i, it, bytes;
-	hsfh_spec_rw_cb_t rcb;
-	hsfh_spec_rw_cb_t wcb;
+	DWORD rc, i, it, bytes, flags;
 	for (;;) {
 		rc = WaitForMultipleObjects(3, hset, FALSE, INFINITE);
 		if (rc != WAIT_TIMEOUT && rc != WAIT_FAILED) {
@@ -120,24 +118,26 @@ static void *ShDescStream_loop(void *p)
 				i = rc - WAIT_OBJECT_0;
 				if (i < 3) {
 					HANDLE rh = hset[i], wh = INVALID_HANDLE_VALUE;
+					hsfh_spec_rw_cb_t rcb = NULL;
+					hsfh_spec_rw_cb_t wcb = NULL;
 					switch (i) {
 						case 1: { // read internal sock; send data using sys handle
 							wh = (HANDLE)(self->fd->h.u64);
-							rcb = NULL;
 							wcb = self->wcb;
 						} break;
 						case 2: { // read sys handle; send data using internal sock (to external)
 							wh = (HANDLE)(ifd);
 							rcb = self->rcb;
-							wcb = NULL;
 						} break;
 						default: break;
 					}
 					if (wh != INVALID_HANDLE_VALUE) {
 						it = 0;
 						rc = 0;
+						if (GetHandleInformation(rh, &flags) == FALSE) {
+							abortStreamLoop(self);
+						}
 						while (1) {
-							// todo broken handle
 							if (WaitForSingleObject(rh, 0) == WAIT_OBJECT_0) { // check the data is available
 								if (rcb) { // special reader
 									int r = rcb(self->user, (uint8_t *)(self->buf), (int)self->bufSize);
@@ -156,6 +156,9 @@ static void *ShDescStream_loop(void *p)
 									rc = 0; // byte received we can wait a little for another one (pauseCharMs)
 								}
 							} else {
+								if (GetHandleInformation(rh, &flags) == FALSE) {
+									abortStreamLoop(self);
+								}
 								if (rc == 0 && i == 2 && self->pauseCharMs > 0) { // only for sys handle
 									Thread_sleep(self->pauseCharMs);
 									rc = 1;
@@ -170,7 +173,9 @@ static void *ShDescStream_loop(void *p)
 								}
 							} else {
 								bytes = 0;
-								WriteFile(wh, (LPVOID)self->buf, it, &bytes, NULL); // todo
+								if (WriteFile(wh, (LPVOID)self->buf, it, &bytes, NULL) == FALSE) {
+									abortStreamLoop(self);
+								}
 								FlushFileBuffers(wh);
 							}
 						}
@@ -182,7 +187,7 @@ static void *ShDescStream_loop(void *p)
 	}
 }
 
-ShDescStream ShDescStream_create(unidesc h, uint32_t rwBufSize, int pauseCharMs)
+HAL_INTERNAL ShDescStream ShDescStream_create(unidesc h, uint32_t rwBufSize, int pauseCharMs)
 {
 	ShDescStream self = calloc(1, sizeof(struct sShDescStream));
 	if (!self) return NULL;
@@ -208,19 +213,25 @@ exit_err:
 	return NULL;
 }
 
-int ShDescStream_write(ShDescStream self, const uint8_t *buf, int size)
+HAL_INTERNAL int ShDescStream_write(ShDescStream self, const uint8_t *buf, int size)
 {
 	if (!self) return -1;
 	return ClientSocket_write(self->fd->e, buf, size);
 }
 
-int ShDescStream_read(ShDescStream self, uint8_t *buf, int size)
+HAL_INTERNAL int ShDescStream_read(ShDescStream self, uint8_t *buf, int size)
 {
 	if (!self) return -1;
 	return ClientSocket_read(self->fd->e, buf, size);
 }
 
-void ShDescStream_setSpecCallbacks(ShDescStream self, void *user, hsfh_spec_rw_cb_t rcb, hsfh_spec_rw_cb_t wcb)
+HAL_INTERNAL int ShDescStream_readAvailable(ShDescStream self)
+{
+	if (!self) return -1;
+	return ClientSocket_readAvailable(self->fd->e);
+}
+
+HAL_INTERNAL void ShDescStream_setSpecCallbacks(ShDescStream self, void *user, hsfh_spec_rw_cb_t rcb, hsfh_spec_rw_cb_t wcb)
 {
 	if (!self) return;
 	self->user = user;
@@ -228,7 +239,7 @@ void ShDescStream_setSpecCallbacks(ShDescStream self, void *user, hsfh_spec_rw_c
 	self->wcb = wcb;
 }
 
-void ShDescStream_destroy(ShDescStream self)
+HAL_INTERNAL void ShDescStream_destroy(ShDescStream self)
 {
 	if (!self) return;
 	Thread_cancel(self->thr);
@@ -238,7 +249,7 @@ void ShDescStream_destroy(ShDescStream self)
 	free(self);
 }
 
-unidesc ShDescStream_getDescriptor(ShDescStream self)
+HAL_INTERNAL unidesc ShDescStream_getDescriptor(ShDescStream self)
 {
 	if (self) {
 		return ClientSocket_getDescriptor(self->fd->e);
@@ -283,7 +294,7 @@ static DgramSocket getLocalSocket(char *buf)
 	return NULL;
 }
 
-ShDescDgramFd ShDescDgramFd_create(unidesc h)
+HAL_INTERNAL ShDescDgramFd ShDescDgramFd_create(unidesc h)
 {
 	DgramSocket e, i;
 	char e_name[MAX_PATH];
@@ -313,7 +324,7 @@ exit_error:
 	return NULL;
 }
 
-void ShDescDgramFd_destroy(ShDescDgramFd self)
+HAL_INTERNAL void ShDescDgramFd_destroy(ShDescDgramFd self)
 {
 	if (!self) return;
 	DgramSocket_destroy(self->e);
@@ -339,9 +350,7 @@ static void *ShDescDgram_loop(void *p)
 		(HANDLE)(ifd),
 		(HANDLE)(self->fd->h.u64),
 	};
-	DWORD rc, i, it, bytes;
-	hsfh_spec_rw_cb_t rcb;
-	hsfh_spec_rw_cb_t wcb;
+	DWORD rc, i, it, bytes, flags;
 	for (;;) {
 		rc = WaitForMultipleObjects(3, hset, FALSE, INFINITE);
 		if (rc != WAIT_TIMEOUT && rc != WAIT_FAILED) {
@@ -349,41 +358,40 @@ static void *ShDescDgram_loop(void *p)
 				i = rc - WAIT_OBJECT_0;
 				if (i < 3) {
 					HANDLE rh = hset[i], wh = INVALID_HANDLE_VALUE;
+					hsfh_spec_rw_cb_t rcb = NULL;
+					hsfh_spec_rw_cb_t wcb = NULL;
 					switch (i) {
 						case 1: { // read internal sock; send data using sys handle
 							wh = (HANDLE)(self->fd->h.u64);
-							rcb = NULL;
 							wcb = self->wcb;
 						} break;
 						case 2: { // read sys handle; send data using internal sock (to external)
 							wh = (HANDLE)(ifd);
 							rcb = self->rcb;
-							wcb = NULL;
 						} break;
 						default: break;
 					}
 					if (wh != INVALID_HANDLE_VALUE) {
 						it = 0;
 						rc = 0;
-						while (1) {
-							// todo broken handle
-							if (WaitForSingleObject(rh, 0) == WAIT_OBJECT_0) { // check the data is available
-								if (rcb) { // special reader
-									int r = rcb(self->user, (uint8_t *)(self->buf), (int)self->bufSize);
-									if (r > 0) {
-										it = (DWORD)r;
-										break;
-									}
+						if (GetHandleInformation(rh, &flags) == FALSE) {
+							abortDgramLoop(self);
+						}
+						if (WaitForSingleObject(rh, 0) == WAIT_OBJECT_0) { // check the data is available
+							if (rcb) { // special reader
+								int r = rcb(self->user, (uint8_t *)(self->buf), (int)self->bufSize);
+								if (r > 0) {
+									it = (DWORD)r;
+								} else {
 									abortDgramLoop(self);
-								} else { // system reader
-									bytes = 0;
-									if (ReadFile(rh, (LPVOID)(self->buf+it), self->bufSize, &bytes, NULL) == FALSE) {
-										abortDgramLoop(self);
-									}
-									it = bytes;
-									break;
 								}
-							} else break;
+							} else { // system reader
+								bytes = 0;
+								if (ReadFile(rh, (LPVOID)(self->buf+it), self->bufSize, &bytes, NULL) == FALSE) {
+									abortDgramLoop(self);
+								}
+								it = bytes;
+							}
 						}
 						if (it > 0) {
 							if (wcb) {
@@ -392,7 +400,9 @@ static void *ShDescDgram_loop(void *p)
 								}
 							} else {
 								bytes = 0;
-								WriteFile(wh, (LPVOID)self->buf, it, &bytes, NULL); // todo
+								if (WriteFile(wh, (LPVOID)self->buf, it, &bytes, NULL) == FALSE) {
+									abortDgramLoop(self);
+								}
 								FlushFileBuffers(wh);
 							}
 						}
@@ -404,7 +414,7 @@ static void *ShDescDgram_loop(void *p)
 	}
 }
 
-ShDescDgram ShDescDgram_create(unidesc h, uint32_t rwBufSize)
+HAL_INTERNAL ShDescDgram ShDescDgram_create(unidesc h, uint32_t rwBufSize)
 {
 	ShDescDgram self = calloc(1, sizeof(struct sShDescDgram));
 	if (!self) return NULL;
@@ -428,19 +438,31 @@ exit_err:
 	return NULL;
 }
 
-int ShDescDgram_write(ShDescDgram self, const uint8_t *buf, int size)
+HAL_INTERNAL int ShDescDgram_write(ShDescDgram self, const uint8_t *buf, int size)
 {
 	if (!self) return -1;
 	return DgramSocket_write(self->fd->e, buf, size);
 }
 
-int ShDescDgram_read(ShDescDgram self, uint8_t *buf, int size)
+HAL_INTERNAL int ShDescDgram_read(ShDescDgram self, uint8_t *buf, int size)
 {
 	if (!self) return -1;
 	return DgramSocket_read(self->fd->e, buf, size);
 }
 
-void ShDescDgram_setSpecCallbacks(ShDescDgram self, void *user, hsfh_spec_rw_cb_t rcb, hsfh_spec_rw_cb_t wcb)
+HAL_INTERNAL int ShDescDgram_readAvailable(ShDescDgram self)
+{
+	if (!self) return -1;
+	return DgramSocket_readAvailable(self->fd->e, false);
+}
+
+HAL_INTERNAL int ShDescDgram_peek(ShDescDgram self, uint8_t *buf, int size)
+{
+	if (!self) return -1;
+	return DgramSocket_peek(self->fd->e, NULL, buf, size);
+}
+
+HAL_INTERNAL void ShDescDgram_setSpecCallbacks(ShDescDgram self, void *user, hsfh_spec_rw_cb_t rcb, hsfh_spec_rw_cb_t wcb)
 {
 	if (!self) return;
 	self->user = user;
@@ -448,7 +470,7 @@ void ShDescDgram_setSpecCallbacks(ShDescDgram self, void *user, hsfh_spec_rw_cb_
 	self->wcb = wcb;
 }
 
-void ShDescDgram_destroy(ShDescDgram self)
+HAL_INTERNAL void ShDescDgram_destroy(ShDescDgram self)
 {
 	if (!self) return;
 	Thread_cancel(self->thr);
@@ -458,7 +480,7 @@ void ShDescDgram_destroy(ShDescDgram self)
 	free(self);
 }
 
-unidesc ShDescDgram_getDescriptor(ShDescDgram self)
+HAL_INTERNAL unidesc ShDescDgram_getDescriptor(ShDescDgram self)
 {
 	if (self) {
 		return DgramSocket_getDescriptor(self->fd->e);
@@ -470,7 +492,7 @@ unidesc ShDescDgram_getDescriptor(ShDescDgram self)
 
 static uint32_t HalShSys_initCnt = 0;
 
-void HalShSys_init(void)
+HAL_INTERNAL void HalShSys_init(void)
 {
 	if (HalShSys_initCnt == 0) {
 		WSADATA wsa;
@@ -481,7 +503,7 @@ void HalShSys_init(void)
 	HalShSys_initCnt++;
 }
 
-void HalShSys_deinit(void)
+HAL_INTERNAL void HalShSys_deinit(void)
 {
 	if (HalShSys_initCnt) {
 		HalShSys_initCnt--;

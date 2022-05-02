@@ -15,54 +15,42 @@
 #define ETH_ALEN 6
 #endif
 
-#define NPF_DRIVER_NPF 1
-#if NPF_DRIVER_NPF
-#define NPF_DRIVER_NAME							"NPF"
-#define NPF_DEVICE_NAMES_PREFIX					NPF_DRIVER_NAME "_"
-#else
-#define NPF_DRIVER_NAME							"NPCAP"
-#define NPF_DEVICE_NAMES_PREFIX					NPF_DRIVER_NAME "\\"
-#endif
-#define NPF_DRIVER_COMPLETE_DEVICE_PREFIX		"\\Device\\" NPF_DEVICE_NAMES_PREFIX
-
-#define STORAGE_SZ_MAX (sizeof(DWORD) + sizeof(IP_ADAPTER_ADDRESSES_LH)*64)
-typedef union {
-	IP_ADAPTER_ADDRESSES t;
-	char max[STORAGE_SZ_MAX];
-} IP_ADAPTER_ADDRESSES_U;
-
 #define MIB_IPADDRTABLE_SZ_MAX (sizeof(DWORD) + sizeof(MIB_IPADDRROW)*128)
 typedef union {
 	MIB_IPADDRTABLE t;
 	char max[MIB_IPADDRTABLE_SZ_MAX];
 } MIB_IPADDRTABLE_U;
 
+#define IP_INTERFACE_INFO_SZ_MAX (sizeof(DWORD) + sizeof(IP_ADAPTER_INDEX_MAP)*128)
+typedef union {
+	IP_INTERFACE_INFO t;
+	char max[IP_INTERFACE_INFO_SZ_MAX];
+} IP_INTERFACE_INFO_U;
+
 
 bool NetwHlpr_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 {
 	if (iface == NULL || addr == NULL) return false;
-
-	MIB_IPADDRTABLE_U u;
-	ULONG sz = sizeof(u);
-	MIB_IPADDRROW *tt;
-	MIB_IFROW r;
 	int idx;
 
 	if (NetwHlpr_interfaceInfo(iface, &idx, NULL, NULL, NULL) == false) 
-		return false;	
+		return false;
 
-	if ( GetIpAddrTable(&u.t, &sz, FALSE) == 0 ) {
-		for (DWORD i = 0; i < u.t.dwNumEntries; ++i) {
-			tt = &u.t.table[i];
-			if (!tt->dwIndex) continue;
-			if (tt->dwIndex == (DWORD)idx) {
-				memset(&r, 0, sizeof(r));
-				r.dwIndex = tt->dwIndex;
-				GetIfEntry(&r);
-				if (r.dwType == MIB_IF_TYPE_ETHERNET) {
-					memcpy(addr, r.bPhysAddr, ETH_ALEN);
-					return true;
-				}
+	DWORD icnt = 0;
+	DWORD idxit = 0;
+	DWORD inum;
+	MIB_IF_ROW2 r;
+	if ( GetNumberOfInterfaces(&inum) != 0 )
+		return false;
+	while (icnt < inum && idxit < 65000) {
+		idxit++;
+		memset(&r, 0, sizeof(r));
+		r.InterfaceIndex = (NET_IFINDEX)idxit;
+		if ( GetIfEntry2(&r) == 0 ) {
+			icnt++;
+			if (r.InterfaceIndex == (NET_IFINDEX)idx) {
+				memcpy(addr, r.PhysicalAddress, ETH_ALEN);
+				return true;
 			}
 		}
 	}
@@ -71,22 +59,22 @@ bool NetwHlpr_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 
 static char *getInterfaceNameByIdx(ULONG idx, char *buf)
 {
-	IP_ADAPTER_ADDRESSES_U u;
+	IP_INTERFACE_INFO_U u;
 	ULONG sz = sizeof(u);
-	// flags from PacketGetAdaptersNPF (packetWin7)
-	GetAdaptersAddresses(AF_UNSPEC, 
-			GAA_FLAG_INCLUDE_ALL_INTERFACES | // Get everything
-			GAA_FLAG_SKIP_DNS_INFO | // Undocumented, reported to help avoid errors on Win10 1809
-			// We don't use any of these features:
-			GAA_FLAG_SKIP_DNS_SERVER |
-			GAA_FLAG_SKIP_ANYCAST |
-			GAA_FLAG_SKIP_MULTICAST |
-			GAA_FLAG_SKIP_FRIENDLY_NAME, NULL, 
-			&u.t, &sz);
-	for (PIP_ADAPTER_ADDRESSES a = &u.t; a; a = a->Next) {
-		if (a->IfIndex == idx) {
-			sprintf(buf, "%s%s", NPF_DRIVER_COMPLETE_DEVICE_PREFIX, a->AdapterName);
-			return buf;
+	MIB_IF_ROW2 r;
+	if ( GetInterfaceInfo(&u.t, &sz) == 0 ) {
+		for (LONG i = 0; i < u.t.NumAdapters; ++i) {
+			IP_ADAPTER_INDEX_MAP *a = &u.t.Adapter[i];
+			if (a->Index == idx) {
+				memset(&r, 0, sizeof(r));
+				r.InterfaceIndex = (NET_IFINDEX)a->Index;
+				if ( GetIfEntry2(&r) == 0 ) {
+					wchar_t szGuidW[40];
+					StringFromGUID2(&r.InterfaceGuid, szGuidW, 40);
+					WideCharToMultiByte(CP_ACP, 0, szGuidW, -1, buf, 40, NULL, NULL);
+					return buf;
+				}
+			}
 		}
 	}
 	return NULL;
@@ -94,30 +82,27 @@ static char *getInterfaceNameByIdx(ULONG idx, char *buf)
 
 static ULONG getInterfaceIdxByName(const char *name)
 {
-	char buf[256];
-	IP_ADAPTER_ADDRESSES_U u;
+	IP_INTERFACE_INFO_U u;
 	ULONG sz = sizeof(u);
+	MIB_IF_ROW2 r;
 	ULONG idx = if_nametoindex(name);
 	if (idx > 0) { 
 		return idx; 
 	}
-	// flags from PacketGetAdaptersNPF (packetWin7)
-	GetAdaptersAddresses(AF_UNSPEC, 
-			GAA_FLAG_INCLUDE_ALL_INTERFACES | // Get everything
-			GAA_FLAG_SKIP_DNS_INFO | // Undocumented, reported to help avoid errors on Win10 1809
-			// We don't use any of these features:
-			GAA_FLAG_SKIP_DNS_SERVER |
-			GAA_FLAG_SKIP_ANYCAST |
-			GAA_FLAG_SKIP_MULTICAST |
-			GAA_FLAG_SKIP_FRIENDLY_NAME, NULL, 
-			&u.t, &sz);
-	for (PIP_ADAPTER_ADDRESSES a = &u.t; a; a = a->Next) {
-		if (strcmp(a->AdapterName, name) == 0) {
-			return a->IfIndex;
-		}
-		sprintf(buf, "%s%s", NPF_DRIVER_COMPLETE_DEVICE_PREFIX, a->AdapterName);
-		if (strcmp(buf, name) == 0) {
-			return a->IfIndex;
+	if ( GetInterfaceInfo(&u.t, &sz) == 0 ) {
+		for (LONG i = 0; i < u.t.NumAdapters; ++i) {
+			IP_ADAPTER_INDEX_MAP *a = &u.t.Adapter[i];
+			memset(&r, 0, sizeof(r));
+			r.InterfaceIndex = (NET_IFINDEX)a->Index;
+			if ( GetIfEntry2(&r) == 0 ) {
+				char buf[40];
+				wchar_t szGuidW[40];
+				StringFromGUID2(&r.InterfaceGuid, szGuidW, 40);
+				WideCharToMultiByte(CP_ACP, 0, szGuidW, -1, buf, 40, NULL, NULL);
+				if (strcmp(buf, name) == 0) {
+					return a->Index;
+				}
+			}
 		}
 	}
 	return 0;

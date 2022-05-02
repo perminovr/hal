@@ -444,6 +444,12 @@ int DgramSocket_readAvailable(DgramSocket self, bool fromRemote)
 	}
 }
 
+int DgramSocket_peek(DgramSocket self, DgramSocketAddress addr, uint8_t *buf, int size)
+{
+	if (self == NULL || addr == NULL || buf == NULL) return -1;
+	return socketReadFrom(self, addr, buf, size, MSG_PEEK);
+}
+
 void DgramSocket_destroy(DgramSocket self)
 {
 	if (self == NULL) return;
