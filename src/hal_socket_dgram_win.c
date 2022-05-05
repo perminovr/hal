@@ -212,7 +212,7 @@ void DgramSocket_setRemote(DgramSocket self, const DgramSocketAddress addr)
 	switch (self->domain) {
 		case (int)ST_Inet: {
 			memcpy(&self->remote, addr, sizeof(union uDgramSocketAddress));
-		} break; 
+		} break;
 		case (int)ST_Local: {
 			memcpy(&self->localremote, addr, sizeof(union uDgramSocketAddress));
 			self->remote.port = NetwHlpr_generatePort(addr->address, HAL_LOCAL_SOCK_PORT_MIN, HAL_LOCAL_SOCK_PORT_MAX);
@@ -231,7 +231,7 @@ void DgramSocket_getRemote(DgramSocket self, DgramSocketAddress addr)
 	switch (self->domain) {
 		case (int)ST_Inet: {
 			memcpy(addr, &self->remote, sizeof(union uDgramSocketAddress));
-		} break; 
+		} break;
 		case (int)ST_Local: {
 			memcpy(addr, &self->localremote, sizeof(union uDgramSocketAddress));
 		} break;
@@ -251,7 +251,7 @@ static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *bu
 	if (rc > 0) {
 		if (addr) {
 			struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-			Hal_ipv4BinToStr(htonl(paddr->sin_addr.s_addr), addr->ip);
+			Hal_ipv4BinToStr(paddr->sin_addr.s_addr, addr->ip);
 			addr->port = htons(paddr->sin_port);
 		}
 	}

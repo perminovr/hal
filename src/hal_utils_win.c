@@ -33,7 +33,7 @@ bool NetwHlpr_getInterfaceMACAddress(const char *iface, uint8_t *addr)
 	if (iface == NULL || addr == NULL) return false;
 	int idx;
 
-	if (NetwHlpr_interfaceInfo(iface, &idx, NULL, NULL, NULL) == false) 
+	if (NetwHlpr_interfaceInfo(iface, &idx, NULL, NULL, NULL) == false)
 		return false;
 
 	DWORD icnt = 0;
@@ -86,8 +86,8 @@ static ULONG getInterfaceIdxByName(const char *name)
 	ULONG sz = sizeof(u);
 	MIB_IF_ROW2 r;
 	ULONG idx = if_nametoindex(name);
-	if (idx > 0) { 
-		return idx; 
+	if (idx > 0) {
+		return idx;
 	}
 	if ( GetInterfaceInfo(&u.t, &sz) == 0 ) {
 		for (LONG i = 0; i < u.t.NumAdapters; ++i) {
@@ -123,7 +123,7 @@ static void anyIpAddrFromIface(ULONG idx, char *ipaddr)
 				r.dwIndex = tt->dwIndex;
 				GetIfEntry(&r);
 				if (r.dwType == MIB_IF_TYPE_ETHERNET) {
-					Hal_ipv4BinToStr(htonl(tt->dwAddr), ipaddr);
+					Hal_ipv4BinToStr(tt->dwAddr, ipaddr);
 					return;
 				}
 			}
@@ -176,8 +176,8 @@ bool NetwHlpr_interfaceInfo(const char *iface, int *num, char *name, char *name2
 	}
 
 	return false;
-	
-exit_found:	
+
+exit_found:
 	if (num) { *num = idx; }
 	if (name) { getInterfaceNameByIdx(idx, name); }
 	if (name2) { if_indextoname(idx, name2); }

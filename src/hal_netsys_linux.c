@@ -498,7 +498,7 @@ bool Netsys_cleanupIface(Netsys self, const char *iface)
 		char *psrcIP = NULL;
 		char *pgwIP = NULL;
 		if (route->dstip != 0) {
-			Hal_ipv4BinToStr(route->dstip, destIP);
+			Hal_ipv4BinToStr(route->dstip, destIP); // todo test
 			NetwHlpr_prefixToMask(route->dstpfx, destMask);
 			pdestIP = destIP;
 			pdestMask = destMask;

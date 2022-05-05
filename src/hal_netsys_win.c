@@ -164,7 +164,7 @@ bool Netsys_findAllRoutes(Netsys self, const char *iface, NetSysRoute_t *out, in
 				found = true;
 				d->gwip = (uint32_t)tt->dwForwardNextHop;
 				d->dstip = (uint32_t)tt->dwForwardDest;
-				d->dstpfx = NetwHlpr_maskToPrefix(Hal_ipv4BinToStr((uint32_t)tt->dwForwardMask, buf));
+				d->dstpfx = NetwHlpr_maskToPrefix(Hal_ipv4BinToStr((uint32_t)tt->dwForwardMask, buf)); // todo test
 				d->prio = (uint32_t)tt->dwForwardMetric1;
 				d->srcip = 0;
 				if (cnt == *size) return true;

@@ -48,7 +48,7 @@ static void anyIpAddrFromIface(const char *ifacename, char *ipaddr, struct ifadd
 		struct sockaddr_in *sa = (struct sockaddr_in *)it->ifa_addr;
 		if (sa && sa->sin_family == AF_INET) {
 			if (strcmp(ifacename, it->ifa_name) == 0) {
-				Hal_ipv4BinToStr(htonl(sa->sin_addr.s_addr), ipaddr);
+				Hal_ipv4BinToStr(sa->sin_addr.s_addr, ipaddr);
 				break;
 			}
 		}

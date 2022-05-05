@@ -334,7 +334,7 @@ static int socketReadFrom(DgramSocket self, DgramSocketAddress addr, uint8_t *bu
 			switch (self->domain) {
 				case AF_INET: {
 					struct sockaddr_in *paddr = (struct sockaddr_in *)&saddr;
-					Hal_ipv4BinToStr(htonl(paddr->sin_addr.s_addr), addr->ip);
+					Hal_ipv4BinToStr(paddr->sin_addr.s_addr, addr->ip);
 					addr->port = htons(paddr->sin_port);
 				} break;
 				case AF_UNIX: {
