@@ -391,7 +391,7 @@ char *Hal_ipv4BinToStr(uint32_t in, char *out)
 	union { uint32_t u32; uint8_t b[4]; } addr;
 	addr.u32 = in;
 	if ( sprintf(out, "%hhu.%hhu.%hhu.%hhu",
-			addr.b[0], addr.b[1], addr.b[2], addr.b[3]) == 4 )
+			addr.b[0], addr.b[1], addr.b[2], addr.b[3]) > 0 )
 	{
 		return out;
 	}
