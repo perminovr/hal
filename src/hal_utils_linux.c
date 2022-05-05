@@ -66,9 +66,11 @@ bool NetwHlpr_interfaceInfo(const char *iface, int *num, char *name, char *name2
 
 	if (strlen(iface) < (sizeof("0.0.0.0")-1)) {
 		if (sscanf(iface, "%d", &idx) == 1) {
-			if_indextoname(idx, buf);
-			ifname = buf;
-			if (addr) anyIpAddrFromIface(ifname, addr, NULL);
+			if (addr || name || name2) {
+				if_indextoname(idx, buf);
+				ifname = buf;
+				if (addr) anyIpAddrFromIface(ifname, addr, NULL);
+			}
 			goto exit_found;
 		}
 	}
@@ -97,7 +99,7 @@ bool NetwHlpr_interfaceInfo(const char *iface, int *num, char *name, char *name2
 	}
 
 	return false;
-	
+
 exit_found:
 	if (num) { *num = idx; }
 	if (name) { strcpy(name, ifname); }

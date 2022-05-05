@@ -183,7 +183,6 @@ static int mnltalk_ipaddr_cb(const struct nlmsghdr *nlh, void *data)
 static int mnltalk_link_cb(const struct nlmsghdr *nlh, void *data)
 {
 	Netsys self = (Netsys)data;
-	struct nlattr *tb[IFLA_MAX+1] = {};
 	struct ifinfomsg *ifm = (struct ifinfomsg *)mnl_nlmsg_get_payload(nlh);
 	NetSysIface_t *link;
 
@@ -610,7 +609,7 @@ bool
 Netsys_findAllIpAddrs(Netsys self, const char *iface, NetSysIpAddr_t *out, int *size)
 { return false; }
 
-bool 
+bool
 Netsys_findAllIfaces(Netsys self, NetSysIfaceType_e filter, NetSysIface_t *out, int *size)
 { return false; }
 

@@ -40,7 +40,7 @@ typedef struct {
 } NetSysRoute_t;
 
 typedef struct {
-	uint32_t ip;	// ip address 
+	uint32_t ip;	// ip address
 	uint8_t pfx;	// network prefix (mask)
 } NetSysIpAddr_t;
 
@@ -182,6 +182,23 @@ Netsys_findAllIfaces(Netsys self, NetSysIfaceType_e filter, NetSysIface_t *out, 
  */
 HAL_API bool
 Netsys_cleanupIface(Netsys self, const char *iface);
+
+HAL_API bool
+Netsys_ipAddrConvert1(const char *ipaddr, const char *ipmask, NetSysIpAddr_t *out);
+HAL_API bool
+Netsys_ipAddrConvert2(const NetSysIpAddr_t *in, char *ipaddr, char *ipmask);
+HAL_API bool
+Netsys_ipRouteConvert1(const char *srcIP,
+		const char *destIP, const char *destMask,
+		const char *gwIP,
+		int priority,
+		NetSysRoute_t *out);
+HAL_API bool
+Netsys_ipRouteConvert2(const NetSysRoute_t *in,
+		char *srcIP,
+		char *destIP, char *destMask,
+		char *gwIP,
+		int *priority);
 
 /**
  * \brief Create Netsys instance

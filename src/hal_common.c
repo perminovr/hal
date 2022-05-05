@@ -43,6 +43,7 @@
 #include <stdio.h>
 
 #include "hal_utils.h"
+#include "hal_netsys.h"
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MD5_DIGEST_SIZE 16
@@ -396,4 +397,58 @@ char *Hal_ipv4BinToStr(uint32_t in, char *out)
 		return out;
 	}
 	return NULL;
+}
+
+bool Netsys_ipAddrConvert1(const char *ipaddr, const char *ipmask, NetSysIpAddr_t *out)
+{
+	if (out) {
+		out->ip = Hal_ipv4StrToBin(ipaddr);
+		out->pfx = NetwHlpr_maskToPrefix(ipmask);
+		return true;
+	}
+	return false;
+}
+
+bool Netsys_ipAddrConvert2(const NetSysIpAddr_t *in, char *ipaddr, char *ipmask)
+{
+	if (in) {
+		Hal_ipv4BinToStr(in->ip, ipaddr);
+		NetwHlpr_prefixToMask(in->pfx, ipmask);
+		return true;
+	}
+	return false;
+}
+
+bool Netsys_ipRouteConvert1(const char *srcIP,
+		const char *destIP, const char *destMask,
+		const char *gwIP,
+		int priority,
+		NetSysRoute_t *out)
+{
+	if (out) {
+		out->srcip = Hal_ipv4StrToBin(srcIP);
+		out->dstip = Hal_ipv4StrToBin(destIP);
+		out->dstpfx = NetwHlpr_maskToPrefix(destMask);
+		out->gwip = Hal_ipv4StrToBin(gwIP);
+		out->prio = (uint32_t)priority;
+		return true;
+	}
+	return false;
+}
+
+bool Netsys_ipRouteConvert2(const NetSysRoute_t *in,
+		char *srcIP,
+		char *destIP, char *destMask,
+		char *gwIP,
+		int *priority)
+{
+	if (in) {
+		Hal_ipv4BinToStr(in->srcip, srcIP);
+		Hal_ipv4BinToStr(in->dstip, destIP);
+		NetwHlpr_prefixToMask(in->dstpfx, destMask);
+		Hal_ipv4BinToStr(in->gwip, gwIP);
+		if (priority) *priority = (int)in->prio;
+		return true;
+	}
+	return false;
 }
