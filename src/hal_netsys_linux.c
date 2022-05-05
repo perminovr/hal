@@ -268,17 +268,17 @@ static bool Netsys_doIpRoute(Netsys self,
 	rtm->rtm_table = RT_TABLE_MAIN;
 	rtm->rtm_type = RTN_UNICAST;
 	rtm->rtm_flags = 0;
-	if (destIP) {
+	if (destIP && strlen(destIP)) {
 		rtm->rtm_dst_len = NetwHlpr_maskToPrefix(destMask);
 		binaddr = Hal_ipv4StrToBin(destIP);
 		mnl_attr_put_u32(nlh, RTA_DST, binaddr);
 	}
-	if (srcIP) {
+	if (srcIP && strlen(srcIP)) {
 		binaddr = Hal_ipv4StrToBin(srcIP);
 		mnl_attr_put_u32(nlh, RTA_PREFSRC, binaddr);
 	}
 	mnl_attr_put_u32(nlh, RTA_OIF, idx);
-	if (gwIP) {
+	if (gwIP && strlen(gwIP)) {
 		binaddr = Hal_ipv4StrToBin(gwIP);
 		mnl_attr_put_u32(nlh, RTA_GATEWAY, binaddr);
 		rtm->rtm_scope = RT_SCOPE_UNIVERSE;
@@ -334,7 +334,7 @@ bool Netsys_addIpAddr(Netsys self, const char *iface,
 	binaddr = Hal_ipv4StrToBin(ipaddr);
 	mnl_attr_put_u32(nlh, IFA_LOCAL, binaddr);
 	mnl_attr_put_u32(nlh, IFA_ADDRESS, binaddr);
-	if (labelstr) { mnl_attr_put_str(nlh, IFA_LABEL, labelstr); }
+	if (labelstr && strlen(labelstr)) { mnl_attr_put_str(nlh, IFA_LABEL, labelstr); }
 	mnl_attr_put_u32(nlh, IFA_RT_PRIORITY, metric);
 	return mnltalk(self, nlh, NULL);
 }

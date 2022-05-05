@@ -259,28 +259,26 @@ void md5hash_final(Md5HashContext *ctx, uint8_t *digest)
 
 uint8_t NetwHlpr_maskToPrefix(const char *strMask)
 {
-	uint8_t ret;
 	uint32_t prefix = 0;
 	uint32_t mask = 0;
-	if (strMask) {
-		if (strlen(strMask) <= 2) {
-			prefix = 32;
-			prefix = (uint32_t)strtoul(strMask, NULL, 10);
-			mask = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF;
-			mask = htonl(mask);
-		} else {
-			mask = ntohl(inet_addr(strMask));
-			for (int i = 31; i >= 0; --i) {
-				if (mask & (1 << i)) {
-					prefix++;
-				} else {
-					break;
-				}
+	if (!strMask) return 0;
+	if (!strlen(strMask)) return 0;
+	if (strlen(strMask) <= 2) {
+		prefix = 32;
+		prefix = (uint32_t)strtoul(strMask, NULL, 10);
+		mask = (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF;
+		mask = htonl(mask);
+	} else {
+		mask = ntohl(inet_addr(strMask));
+		for (int i = 31; i >= 0; --i) {
+			if (mask & (1 << i)) {
+				prefix++;
+			} else {
+				break;
 			}
 		}
 	}
-	ret = (uint8_t)prefix;
-	return ret;
+	return (uint8_t)prefix;
 }
 
 char *NetwHlpr_prefixToMask(int prefix, char *buf)
@@ -297,21 +295,21 @@ char *NetwHlpr_prefixToMask(int prefix, char *buf)
 uint32_t NetwHlpr_broadcast(const char *ip, uint8_t prefix)
 {
 	uint32_t ret = 0;
-	if (ip) {
-		ret = htonl(inet_addr(ip));
-		if (ret) {
-			for (int i = 0; i < 32-prefix; ++i) {
-				ret |= (1 << i);
-			}
+	if (!ip) return 0;
+	if (!strlen(ip)) return 0;
+	ret = htonl(inet_addr(ip));
+	if (ret) {
+		for (int i = 0; i < 32-prefix; ++i) {
+			ret |= (1 << i);
 		}
-		ret = htonl(ret);
 	}
-	return ret;
+	return htonl(ret);
 }
 
 uint32_t NetwHlpr_subnet(const char *ip, uint8_t prefix)
 {
 	if (!ip) return 0;
+	if (!strlen(ip)) return 0;
 	uint32_t mask = (0xFFFFFFFF << (32-prefix));
 	return htonl(htonl(inet_addr(ip)) & mask);
 }
@@ -383,6 +381,7 @@ uint16_t NetwHlpr_generatePort(const char *name, uint16_t min, uint16_t max)
 uint32_t Hal_ipv4StrToBin(const char *ip)
 {
 	if (!ip) return 0;
+	if (!strlen(ip)) return 0;
 	return (uint32_t)inet_addr(ip);
 }
 
