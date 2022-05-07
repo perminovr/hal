@@ -116,16 +116,16 @@ static int mnltalk_route_cb(const struct nlmsghdr *nlh, void *data)
 		memset(route, 0, sizeof(NetSysRoute_t));
 		if (tb[RTA_DST]) {
 			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_DST]);
-			route->dstip = htonl(inaddr->s_addr);
+			route->dstip = (inaddr->s_addr);
 			route->dstpfx = rtm->rtm_dst_len;
 		}
 		if (tb[RTA_PREFSRC]) {
 			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_PREFSRC]);
-			route->srcip = htonl(inaddr->s_addr);
+			route->srcip = (inaddr->s_addr);
 		}
 		if (tb[RTA_GATEWAY]) {
 			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[RTA_GATEWAY]);
-			route->gwip = htonl(inaddr->s_addr);
+			route->gwip = (inaddr->s_addr);
 		}
 		if (tb[RTA_PRIORITY]) {
 			route->prio = mnl_attr_get_u32(tb[RTA_PRIORITY]);
@@ -172,7 +172,7 @@ static int mnltalk_ipaddr_cb(const struct nlmsghdr *nlh, void *data)
 		if (self->searchmem.ipaddr.it >= self->searchmem.ipaddr.max) return MNL_CB_OK;
 		{
 			inaddr = (struct in_addr *)mnl_attr_get_payload(tb[IFA_ADDRESS]);
-			ipaddr->ip = htonl(inaddr->s_addr);
+			ipaddr->ip = (inaddr->s_addr);
 			ipaddr->pfx = ifa->ifa_prefixlen;
 		}
 	}
@@ -498,7 +498,7 @@ bool Netsys_cleanupIface(Netsys self, const char *iface)
 		char *psrcIP = NULL;
 		char *pgwIP = NULL;
 		if (route->dstip != 0) {
-			Hal_ipv4BinToStr(route->dstip, destIP); // todo test
+			Hal_ipv4BinToStr(route->dstip, destIP);
 			NetwHlpr_prefixToMask(route->dstpfx, destMask);
 			pdestIP = destIP;
 			pdestMask = destMask;
