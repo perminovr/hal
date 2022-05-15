@@ -104,6 +104,41 @@ void Mutex_destroy(Mutex self)
 }
 
 
+RwLock RwLock_create(void)
+{
+	RwLock self = calloc(1, sizeof(pthread_rwlock_t));
+	// pthread_rwlockattr_t attr;
+	// memset(&attr, 0, sizeof(pthread_rwlockattr_t));
+	pthread_rwlock_init((pthread_rwlock_t*)self, NULL /*&attr*/);
+	return self;
+}
+
+void RwLock_wlock(RwLock self)
+{
+	if (self == NULL) return;
+	pthread_rwlock_wrlock((pthread_rwlock_t*)self);
+}
+
+void RwLock_rlock(RwLock self)
+{
+	if (self == NULL) return;
+	pthread_rwlock_rdlock((pthread_rwlock_t*)self);
+}
+
+void RwLock_unlock(RwLock self)
+{
+	if (self == NULL) return;
+	pthread_rwlock_unlock((pthread_rwlock_t*)self);
+}
+
+void RwLock_destroy(RwLock self)
+{
+	if (self == NULL) return;
+	pthread_rwlock_destroy((pthread_rwlock_t*)self);
+	free(self);
+}
+
+
 Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
 {
 	Thread self = (Thread) calloc(1, sizeof(struct sThread));

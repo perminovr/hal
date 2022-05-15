@@ -33,6 +33,9 @@ typedef void *Semaphore;
 /** Qpaque reference of a Mutex instance */
 typedef void *Mutex;
 
+/** Qpaque reference of a Mutex instance */
+typedef void *RwLock;
+
 /** Opaque reference of a Thread instance */
 typedef struct sThread *Thread;
 
@@ -191,6 +194,22 @@ Mutex_unlock(Mutex self);
 
 HAL_API void
 Mutex_destroy(Mutex self);
+
+
+HAL_API RwLock
+RwLock_create(void);
+
+HAL_API void
+RwLock_wlock(RwLock self);
+
+HAL_API void
+RwLock_rlock(RwLock self);
+
+HAL_API void
+RwLock_unlock(RwLock self);
+
+HAL_API void
+RwLock_destroy(RwLock self);
 
 
 #define SmartMutex Mutex
