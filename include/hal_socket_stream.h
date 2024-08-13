@@ -307,6 +307,17 @@ ClientSocket_write(ClientSocket self, const uint8_t *buf, int size);
 /**
  * \brief Get the address of the peer application (IP address and port number)
  *
+ * \param ud the client unidesc
+ * \param address remote server address (protocol specific)
+ *
+ * \return true in case of success, false otherwise
+ */
+HAL_API bool
+ClientUnidesc_getPeerAddress(unidesc ud, ClientSocketAddress address);
+
+/**
+ * \brief Get the address of the peer application (IP address and port number)
+ *
  * \param self the client socket instance
  * \param address remote server address (protocol specific)
  *
@@ -352,6 +363,25 @@ ClientSocket_destroy(ClientSocket self);
  */
 HAL_API unidesc
 ClientSocket_getDescriptor(ClientSocket self);
+
+/**
+ * \brief Set user data pointer
+ *
+ * \param self the client socket instance
+ * \param userData the user data
+ */
+HAL_API void
+ClientSocket_setUserData(ClientSocket self, void *userData);
+
+/**
+ * \brief Get user data pointer
+ *
+ * \param self the client socket instance
+ *
+ * \return userData set by \ref ClientSocket_setUserData
+ */
+HAL_API void *
+ClientSocket_getUserData(ClientSocket self);
 
 
 /*! @} */

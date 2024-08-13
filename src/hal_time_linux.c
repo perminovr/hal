@@ -14,6 +14,15 @@ int Hal_getRealTimeSpec(struct timespechal *ts)
 	return ret;
 }
 
+int Hal_setRealTime(struct timespechal *ts)
+{
+	struct timespec now;
+	now.tv_sec = (time_t)ts->tv_sec;
+	now.tv_nsec = (long)ts->tv_nsec;
+	int ret = clock_settime(CLOCK_REALTIME, &now);
+	return ret;
+}
+
 uint64_t Hal_getTimeInMs(void)
 {
 	struct timeval now;

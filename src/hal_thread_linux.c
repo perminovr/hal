@@ -18,35 +18,37 @@ struct sThread {
 	ThreadExecutionFunction function;
 	void *parameter;
 	pthread_t pthread;
-	int state;
+	bool running;
 	bool autodestroy;
-	Signal cs;
-	Signal ps;
-	Semaphore sem1;
-	Semaphore sem2;
+    int pauseCnt;
+	Signal cs; // cancel signal
+	Signal ps; // pause signal
+	Signal rs; // resume signal
+	Signal us; // user signal
+	Semaphore ps_sem; // pause semaphore
 };
 
 
-Semaphore Semaphore_create(int initialValue)
+Semaphore HalSemaphore_create(int initialValue)
 {
 	Semaphore self = calloc(1, sizeof(sem_t));
 	sem_init((sem_t*) self, 0, initialValue);
 	return self;
 }
 
-void Semaphore_wait(Semaphore self)
+void HalSemaphore_wait(Semaphore self)
 {
 	if (self == NULL) return;
 	sem_wait((sem_t*) self);
 }
 
-void Semaphore_post(Semaphore self)
+void HalSemaphore_post(Semaphore self)
 {
 	if (self == NULL) return;
 	sem_post((sem_t*) self);
 }
 
-void Semaphore_destroy(Semaphore self)
+void HalSemaphore_destroy(Semaphore self)
 {
 	if (self == NULL) return;
 	sem_destroy((sem_t*) self);
@@ -54,7 +56,7 @@ void Semaphore_destroy(Semaphore self)
 }
 
 
-Mutex Mutex_create(void)
+Mutex HalMutex_create(void)
 {
 	Mutex self = calloc(1, sizeof(pthread_mutex_t));
 	pthread_mutexattr_t attr;
@@ -64,19 +66,19 @@ Mutex Mutex_create(void)
 	return self;
 }
 
-void Mutex_lock(Mutex self)
+void HalMutex_lock(Mutex self)
 {
 	if (self == NULL) return;
 	pthread_mutex_lock((pthread_mutex_t*)self);
 }
 
-int Mutex_trylock(Mutex self)
+int HalMutex_trylock(Mutex self)
 {
 	if (self == NULL) return -1;
 	return pthread_mutex_trylock((pthread_mutex_t*)self);
 }
 
-int Mutex_timedlock(Mutex self, int millies)
+int HalMutex_timedlock(Mutex self, int millies)
 {
 	if (self == NULL) return -1;
 	struct timespec t;
@@ -90,13 +92,13 @@ int Mutex_timedlock(Mutex self, int millies)
 	return pthread_mutex_timedlock((pthread_mutex_t*)self, &t);
 }
 
-void Mutex_unlock(Mutex self)
+void HalMutex_unlock(Mutex self)
 {
 	if (self == NULL) return;
 	pthread_mutex_unlock((pthread_mutex_t*)self);
 }
 
-void Mutex_destroy(Mutex self)
+void HalMutex_destroy(Mutex self)
 {
 	if (self == NULL) return;
 	pthread_mutex_destroy((pthread_mutex_t*)self);
@@ -104,7 +106,7 @@ void Mutex_destroy(Mutex self)
 }
 
 
-RwLock RwLock_create(void)
+RwLock HalRwLock_create(void)
 {
 	RwLock self = calloc(1, sizeof(pthread_rwlock_t));
 	// pthread_rwlockattr_t attr;
@@ -113,25 +115,25 @@ RwLock RwLock_create(void)
 	return self;
 }
 
-void RwLock_wlock(RwLock self)
+void HalRwLock_wlock(RwLock self)
 {
 	if (self == NULL) return;
 	pthread_rwlock_wrlock((pthread_rwlock_t*)self);
 }
 
-void RwLock_rlock(RwLock self)
+void HalRwLock_rlock(RwLock self)
 {
 	if (self == NULL) return;
 	pthread_rwlock_rdlock((pthread_rwlock_t*)self);
 }
 
-void RwLock_unlock(RwLock self)
+void HalRwLock_unlock(RwLock self)
 {
 	if (self == NULL) return;
 	pthread_rwlock_unlock((pthread_rwlock_t*)self);
 }
 
-void RwLock_destroy(RwLock self)
+void HalRwLock_destroy(RwLock self)
 {
 	if (self == NULL) return;
 	pthread_rwlock_destroy((pthread_rwlock_t*)self);
@@ -139,56 +141,65 @@ void RwLock_destroy(RwLock self)
 }
 
 
-Thread Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
+Thread HalThread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy)
 {
 	Thread self = (Thread) calloc(1, sizeof(struct sThread));
 	if (!self) return NULL;
 
-	self->cs = Signal_create();
+	self->cs = HalSignal_create();
 	if (!self->cs) {
 		goto exit_self;
 	}
 
-	self->ps = Signal_create();
+	self->ps = HalSignal_create();
 	if (!self->ps) {
 		goto exit_cs;
 	}
 
-	self->sem1 = Semaphore_create(1);
-	if (!self->sem1) {
+	self->rs = HalSignal_create();
+	if (!self->rs) {
 		goto exit_ps;
 	}
 
-	self->sem2 = Semaphore_create(1);
-	if (!self->sem2) {
-		goto exit_sem1;
+	self->us = HalSignal_create();
+	if (!self->us) {
+		goto exit_rs;
+	}
+
+	self->ps_sem = HalSemaphore_create(1);
+	if (!self->ps_sem) {
+		goto exit_us;
 	}
 
 	self->stackSize = stackSize;
 	self->parameter = parameter;
 	self->function = function;
-	self->state = 0;
+	self->running = false;
+	self->pauseCnt = 0;
 	self->autodestroy = autodestroy;
 
 	return self;
 
-exit_sem1:
-	Semaphore_destroy(self->sem1);
+exit_us:
+	HalSignal_destroy(self->us);
+exit_rs:
+	HalSignal_destroy(self->rs);
 exit_ps:
-	Signal_destroy(self->ps);
+	HalSignal_destroy(self->ps);
 exit_cs:
-	Signal_destroy(self->cs);
+	HalSignal_destroy(self->cs);
 exit_self:
 	free(self);
 	return NULL;
 }
 
-static void Thread_destroyMem(Thread self)
+static void HalThread_destroyMem(Thread self)
 {
-	Semaphore_destroy(self->sem2);
-	Semaphore_destroy(self->sem1);
-	Signal_destroy(self->ps);
-	Signal_destroy(self->cs);
+	HalSemaphore_destroy(self->ps_sem);
+	HalSignal_destroy(self->us);
+	HalSignal_destroy(self->rs);
+	HalSignal_destroy(self->ps);
+	HalSignal_destroy(self->cs);
 	free(self);
 }
 
@@ -196,12 +207,12 @@ static void *destroyAutomaticThread(void *parameter)
 {
 	Thread self = (Thread)parameter;
 	self->function(self->parameter);
-	self->state = 0;
-	Thread_destroyMem(self);
+	self->running = false;
+	HalThread_destroyMem(self);
 	pthread_exit(NULL);
 }
 
-void Thread_start(Thread self)
+void HalThread_start(Thread self)
 {
 	if (self == NULL) return;
 	pthread_attr_t attr;
@@ -218,97 +229,127 @@ void Thread_start(Thread self)
 		pthread_create(&self->pthread, pattr, self->function, self->parameter);
 	}
 
-	self->state = 1;
+	self->running = true;
 }
 
-void Thread_destroy(Thread self)
+void HalThread_join(Thread self)
+{
+	if (self == NULL) return;
+	if (!self->autodestroy && self->running) {
+		pthread_join(self->pthread, NULL);
+	}
+}
+
+void HalThread_destroy(Thread self)
 {
 	if (self == NULL) return;
 	if (self->autodestroy) {
-		Signal_raise(self->cs);
+		HalSignal_raise(self->cs);
 		return; // can't do anything else
 	}
-	if (self->state == 1) {
+	if (self->running) {
 		pthread_join(self->pthread, NULL);
+		self->running = false;
 	}
-	Thread_destroyMem(self);
+	HalThread_destroyMem(self);
 }
 
-void Thread_sleep(int millies)
+void HalThread_sleep(int millies)
 {
 	usleep(millies * 1000);
 }
 
-void Thread_yield(void)
+void HalThread_yield(void)
 {
-	sched_yield();
+	usleep(1);
 }
 
-void Thread_cancel(Thread self)
+void HalThread_cancel(Thread self)
 {
 	if (self == NULL) return;
-	Signal_raise(self->cs);
+	HalSignal_raise(self->cs);
 }
 
-void Thread_testCancel(Thread self)
+void HalThread_testCancel(Thread self)
 {
 	if (self == NULL) return;
-	if (Signal_event(self->cs)) {
-		Signal_end(self->cs);
+	if (HalSignal_event(self->cs)) {
+		HalSignal_end(self->cs);
 		if (self->autodestroy)
 			return;
 		pthread_exit(NULL);
 	}
 }
 
-void Thread_testPause(Thread self)
+void HalThread_testPause(Thread self)
 {
-	if (Signal_event(self->ps)) {
-		Signal_end(self->ps);
-		Semaphore_post(self->sem2); // unlock pause
-		Semaphore_wait(self->sem1); // waiting for resume
-		Semaphore_post(self->sem1); // free resource
+	if (self == NULL) return;
+	if (HalSignal_event(self->ps)) {
+		HalSignal_end(self->ps);
+		HalSignal_end(self->rs); // clear for the case
+		HalSignal_raise(self->us); // msg to user: on pause
+		HalSignal_wait(self->rs); // waiting for 'resume'
+		HalSignal_raise(self->us); // msg to user: resume
 	}
 }
 
-void Thread_pause(Thread self)
+static void HalThread_msgToThread(Thread self, Signal s)
 {
-	if (self == NULL) return;
-	pthread_t pthread = pthread_self();
-	if (self->pthread == pthread) return;
-	Semaphore_wait(self->sem1);
-	Semaphore_wait(self->sem2);
-	Signal_raise(self->ps);
-	Semaphore_wait(self->sem2); // waiting for thread
-	Semaphore_post(self->sem2); // free resource
+	HalSignal_end(self->us); // clear for the case
+	HalSignal_raise(s); // msg to thread: pause/resume
+	HalSignal_wait(self->us); // waiting for thread
 }
 
-void Thread_resume(Thread self)
+void HalThread_pause(Thread self)
 {
 	if (self == NULL) return;
-	Semaphore_post(self->sem1);
+	if (self->pthread == pthread_self()) return;
+	HalSemaphore_wait(self->ps_sem); // lock 3rd+ thread
+    if (self->pauseCnt++ == 0) {
+	    HalThread_msgToThread(self, self->ps);
+    }
+	HalSemaphore_post(self->ps_sem); // unlock 3rd+ thread
 }
 
-unidesc Thread_getNativeDescriptor(Thread self)
+void HalThread_resume(Thread self)
+{
+	if (self == NULL) return;
+	if (self->pthread == pthread_self()) return;
+	HalSemaphore_wait(self->ps_sem); // lock 3rd+ thread
+    if (--self->pauseCnt < 0) { self->pauseCnt = 0; }
+    if (self->pauseCnt == 0) {
+	    HalThread_msgToThread(self, self->rs);
+    }
+	HalSemaphore_post(self->ps_sem); // unlock 3rd+ thread
+}
+
+unidesc HalThread_getNativeDescriptor(Thread self)
 {
 	unidesc ret;
 	ret.u64 = (self != NULL)? self->pthread : 0;
 	return ret;
 }
 
-Signal Thread_getCancelSignal(Thread self)
+unidesc HalThread_getCurrentThreadNativeDescriptor(void)
+{
+	unidesc ret;
+	ret.u64 = (uint64_t)pthread_self();
+	return ret;
+}
+
+Signal HalThread_getCancelSignal(Thread self)
 {
 	if (self == NULL) return NULL;
 	return self->cs;
 }
 
-Signal Thread_getPauseSignal(Thread self)
+Signal HalThread_getPauseSignal(Thread self)
 {
 	if (self == NULL) return NULL;
 	return self->ps;
 }
 
-void Thread_setName(Thread self, const char *name)
+void HalThread_setName(Thread self, const char *name)
 {
 	if (self == NULL || name == NULL) return;
 	if (self->pthread)
@@ -322,7 +363,7 @@ struct sSignal {
 	int fd;
 };
 
-Signal Signal_create(void)
+Signal HalSignal_create(void)
 {
 	Signal self = (Signal)calloc(1, sizeof(struct sSignal));
 	self->fd = eventfd(0, 0);
@@ -331,38 +372,53 @@ Signal Signal_create(void)
 	return self;
 }
 
-void Signal_raise(Signal self)
+void HalSignal_raise(Signal self)
 {
 	if (self == NULL) return;
 	uint64_t buf = 1;
-	(void)write(self->fd, &buf, EVENT_DSIZE);
+	int rc = write(self->fd, &buf, EVENT_DSIZE);
+	(void)rc;
 }
 
-void Signal_end(Signal self)
+void HalSignal_end(Signal self)
 {
 	if (self == NULL) return;
 	uint64_t buf = 1;
-	(void)read(self->fd, &buf, EVENT_DSIZE);
+	int rc = read(self->fd, &buf, EVENT_DSIZE);
+	(void)rc;
 }
 
-bool Signal_event(Signal self)
+bool HalSignal_event(Signal self)
 {
 	if (self == NULL) return false;
 	struct pollfd pfd;
 	pfd.fd = self->fd;
 	pfd.events = POLLIN;
 	int rc = poll(&pfd, 1, 0);
-	return (rc > 0);
+	return (rc > 0 && (pfd.revents&POLLIN));
 }
 
-void Signal_destroy(Signal self)
+void HalSignal_wait(Signal self)
+{
+	if (self == NULL) return;
+	int rc;
+	struct pollfd pfd;
+	pfd.fd = self->fd;
+	pfd.events = POLLIN;
+	do {
+		rc = poll(&pfd, 1, -1);
+	} while (rc <= 0 || (pfd.revents & POLLIN) == 0);
+	HalSignal_end(self);
+}
+
+void HalSignal_destroy(Signal self)
 {
 	if (self == NULL) return;
 	close(self->fd);
 	free(self);
 }
 
-unidesc Signal_getDescriptor(Signal self)
+unidesc HalSignal_getDescriptor(Signal self)
 {
 	if (self) {
 		unidesc ret;

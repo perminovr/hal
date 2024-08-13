@@ -134,6 +134,12 @@ HAL_API int
 SerialPort_write(SerialPort self, uint8_t *buffer, int numberOfBytes);
 
 /**
+ * \brief Same as @ref SerialPort_write, but wait for pending output to be written
+ */
+HAL_API int
+SerialPort_writeAndWait(SerialPort self, uint8_t *buffer, int numberOfBytes);
+
+/**
  * \brief Get the error code of the last operation
  */
 HAL_API SerialPortError

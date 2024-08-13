@@ -252,4 +252,9 @@ bool FileSystem_moveDirectory(const char *dirName, const char *newDirName)
 	return (rename(dirName, newDirName) == 0)? true : false;
 }
 
+bool FileSystem_realPath(const char *path, char *realPath)
+{
+	return (realpath(path, realPath) == NULL)? false : true;
+}
+
 #endif // __linux__

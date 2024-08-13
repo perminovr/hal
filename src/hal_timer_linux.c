@@ -9,6 +9,7 @@
 
 struct sTimer {
 	int fd;
+	bool running;
 	AccurateTime_t lastTimeout;
 };
 
@@ -30,6 +31,7 @@ bool Timer_setTimeout(Timer self, AccurateTime_t *timeout)
 	self->lastTimeout.nsec = timeout->nsec;
 
 	timerfd_settime(self->fd, 0, &its, NULL);
+	self->running = true;
 
 	return true;
 }
@@ -45,6 +47,7 @@ bool Timer_repeatTimeout(Timer self)
 	its.it_value.tv_nsec = self->lastTimeout.nsec;
 
 	timerfd_settime(self->fd, 0, &its, NULL);
+	self->running = true;
 
 	return true;
 }
@@ -65,6 +68,7 @@ bool Timer_setPeriod(Timer self, AccurateTime_t *period)
 	its.it_interval.tv_nsec = period->nsec;
 
 	timerfd_settime(self->fd, 0, &its, NULL);
+	self->running = true;
 
 	return true;
 }
@@ -83,7 +87,9 @@ void Timer_endEvent(Timer self)
 {
 	if (self == NULL) return;
 	uint64_t buf;
-	(void)read(self->fd, &buf, sizeof(uint64_t));
+	int rc = read(self->fd, &buf, sizeof(uint64_t));
+	(void)rc;
+	self->running = false;
 }
 
 Timer Timer_create(void)
@@ -95,6 +101,7 @@ Timer Timer_create(void)
 			free(self);
 			return NULL;
 		}
+		self->running = false;
 	}
 	return self;
 }
@@ -117,6 +124,10 @@ unidesc Timer_getDescriptor(Timer self)
 	return Hal_getInvalidUnidesc();
 }
 
+bool Timer_isRunning(Timer self)
+{
+	return self? self->running : false;
+}
 
 unidesc Timer_setSingleShot(AccurateTime_t *time)
 {

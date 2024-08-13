@@ -55,6 +55,16 @@ Hal_getTimeInMs(void);
 HAL_API uint64_t
 Hal_getMonotonicTimeInMs(void);
 
+/**
+ * Set the system real time
+ *
+ * \return 0 - ok, !0 - failed
+ */
+HAL_API int
+Hal_setRealTime(struct timespechal *ts);
+
+#define Hal_getRealTime Hal_getRealTimeSpec
+
 
 /*! @} */
 

@@ -28,7 +28,6 @@
 #include <string.h>
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
-#include <sys/io.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/select.h>
@@ -47,6 +46,7 @@ struct sClientSocket {
 	int fd;
 	int domain;
 	bool inreset;
+	void *userData;
 	//
 	ServerSocket server;
 	int idx;
@@ -76,6 +76,12 @@ static inline void setSocketNonBlocking(int fd)
 	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+static inline void disableSocketTimeWait(int fd)
+{
+	struct linger lin = { .l_onoff = 1, .l_linger = 0 };
+	setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger));
+}
+
 static inline int getSocketAvailableToRead(int fd)
 {
 	int val = 0;
@@ -88,7 +94,7 @@ static inline int getSocketAvailableToRead(int fd)
 
 ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uint16_t port)
 {
-	if (address == NULL || port == 0) return NULL;
+	if (port == 0) return NULL;
 
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd < 0) return NULL;
@@ -96,10 +102,6 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 	struct sockaddr_in serverAddress;
 	Mutex mu = NULL;
 	ServerSocket self;
-	struct linger lin = {
-		.l_onoff = 1,
-		.l_linger = 0
-	};
 
 	if (!prepareSocketAddress(address, port, &serverAddress)) {
 		goto exit_error;
@@ -108,10 +110,9 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 		goto exit_error;
 	}
 
-	// disable TIME_WAIT
-	if (setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) < 0) goto exit_error;
+	disableSocketTimeWait(fd);
 
-	mu = Mutex_create();
+	mu = HalMutex_create();
 	if (!mu) {
 		goto exit_error;
 	}
@@ -130,7 +131,7 @@ ServerSocket TcpServerSocket_create(int maxConnections, const char *address, uin
 	}
 
 exit_error:
-	Mutex_destroy(mu);
+	HalMutex_destroy(mu);
 	close(fd);
 	return NULL;
 }
@@ -142,10 +143,6 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 	if (fd < 0) return NULL;
 
 	ClientSocket self;
-	struct linger lin = {
-		.l_onoff = 1,
-		.l_linger = 0
-	};
 
 	if (ip || port) {
 		struct sockaddr_in addr;
@@ -157,14 +154,14 @@ ClientSocket TcpClientSocket_createAndBind(const char *ip, uint16_t port)
 		}
 	}
 
-	// RST instead FIN
-	if (setsockopt(fd, SOL_SOCKET, SO_LINGER, (const char *)&lin, sizeof(struct linger)) < 0) goto exit_error;
+	disableSocketTimeWait(fd);
 
 	self = (ClientSocket)calloc(1, sizeof(struct sClientSocket));
 	if (self) {
 		self->fd = fd;
 		self->domain = AF_INET;
 		self->inreset = true;
+		self->userData = NULL;
 		self->server = NULL;
 		self->idx = -1;
 		setSocketNonBlocking(fd);
@@ -228,7 +225,7 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 		goto exit_error;
 	}
 
-	mu = Mutex_create();
+	mu = HalMutex_create();
 	if (!mu) {
 		goto exit_error;
 	}
@@ -247,7 +244,7 @@ ServerSocket LocalServerSocket_create(int maxConnections, const char *address)
 	}
 
 exit_error:
-	Mutex_destroy(mu);
+	HalMutex_destroy(mu);
 	close(fd);
 	return NULL;
 }
@@ -269,6 +266,7 @@ ClientSocket LocalClientSocket_create(void)
 		self->fd = fd;
 		self->domain = AF_UNIX;
 		self->inreset = true;
+		self->userData = NULL;
 		self->server = NULL;
 		self->idx = -1;
 		setSocketNonBlocking(fd);
@@ -297,10 +295,13 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 	fd = accept(self->fd, NULL, NULL);
 
 	if (fd >= 0) {
-		Mutex_lock(self->clients.mu);
+		disableSocketTimeWait(fd);
+		setSocketNonBlocking(fd);
+
+		HalMutex_lock(self->clients.mu);
 		{
 			if (self->clients.size >= self->clients.maxConnections) {
-				Mutex_unlock(self->clients.mu);
+				HalMutex_unlock(self->clients.mu);
 				goto exit_error;
 			}
 			for (int i = 0; i < self->clients.maxConnections; ++i) {
@@ -309,6 +310,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 					conSocket->fd = fd;
 					conSocket->domain = self->domain;
 					conSocket->inreset = false;
+					conSocket->userData = NULL;
 					conSocket->server = self;
 					conSocket->idx = i;
 					self->clients.size++;
@@ -316,7 +318,7 @@ ClientSocket ServerSocket_accept(ServerSocket self)
 				}
 			}
 		}
-		Mutex_unlock(self->clients.mu);
+		HalMutex_unlock(self->clients.mu);
 	}
 
 	return conSocket;
@@ -329,9 +331,9 @@ exit_error:
 int ServerSocket_getClientsNumber(ServerSocket self)
 {
 	if (self == NULL) return 0;
-	Mutex_lock(self->clients.mu);
+	HalMutex_lock(self->clients.mu);
 	int cnt = self->clients.size;
-	Mutex_unlock(self->clients.mu);
+	HalMutex_unlock(self->clients.mu);
 	return cnt;
 }
 
@@ -340,7 +342,7 @@ ServerClient ServerSocket_getClients(ServerSocket self)
 	ServerClient ret = NULL;
 	ServerClient it = NULL;
 	if (self == NULL) return NULL;
-	Mutex_lock(self->clients.mu);
+	HalMutex_lock(self->clients.mu);
 	if (self->clients.size > 0) {
 		for (int i = 0; i < self->clients.maxConnections; ++i) {
 			ClientSocket c = &(self->clients.self[i]);
@@ -353,7 +355,7 @@ ServerClient ServerSocket_getClients(ServerSocket self)
 			}
 		}
 	}
-	Mutex_unlock(self->clients.mu);
+	HalMutex_unlock(self->clients.mu);
 	return ret;
 }
 
@@ -361,28 +363,29 @@ static void ServerSocket_deleteClient(ServerSocket self, ClientSocket client)
 {
 	if (self == NULL || client == NULL) return;
 	if (client->idx >= 0) {
-		Mutex_lock(self->clients.mu);
+		HalMutex_lock(self->clients.mu);
 		{
 			client->inreset = true;
 			client->server = NULL;
 			client->idx = -1;
 			self->clients.size--;
 		}
-		Mutex_unlock(self->clients.mu);
+		HalMutex_unlock(self->clients.mu);
 	}
 }
 
 static inline void closeAndShutdownSocket(int fd)
 {
 	if (fd != -1) {
-		shutdown(fd, SHUT_RDWR);
+		// shutdown(fd, SHUT_RDWR); shutdown leads to TIME_WAIT state
 		close(fd);
 	}
 }
 
 void ServerSocket_closeClients(ServerSocket self)
 {
-	Mutex_lock(self->clients.mu);
+	if (self == NULL) return;
+	HalMutex_lock(self->clients.mu);
 	if (self->clients.size > 0) {
 		for (int i = 0; i < self->clients.maxConnections; ++i) {
 			ClientSocket c = &(self->clients.self[i]);
@@ -391,14 +394,14 @@ void ServerSocket_closeClients(ServerSocket self)
 			}
 		}
 	}
-	Mutex_unlock(self->clients.mu);
+	HalMutex_unlock(self->clients.mu);
 }
 
 bool ServerSocket_destroy(ServerSocket self)
 {
 	if (self == NULL) return false;
 	if (self->clients.size != 0) return false;
-	Mutex_destroy(self->clients.mu);
+	HalMutex_destroy(self->clients.mu);
 	free(self->clients.self);
 	closeAndShutdownSocket(self->fd);
 	self->fd = -1;
@@ -591,15 +594,23 @@ static bool convertAddressToStr(struct sockaddr_storage *addr, ClientSocketAddre
 	return true;
 }
 
-bool ClientSocket_getPeerAddress(ClientSocket self, ClientSocketAddress address)
+bool ClientUnidesc_getPeerAddress(unidesc ud, ClientSocketAddress address)
 {
-	if (self == NULL || address == NULL) return false;
+	if (address == NULL) return false;
 	struct sockaddr_storage addr;
 	socklen_t addrLen = sizeof(addr);
-	if (getpeername(self->fd, (struct sockaddr*) &addr, &addrLen) == 0) {
+	if (getpeername(ud.i32, (struct sockaddr*) &addr, &addrLen) == 0) {
 		return convertAddressToStr(&addr, address);
 	}
 	return false;
+}
+
+bool ClientSocket_getPeerAddress(ClientSocket self, ClientSocketAddress address)
+{
+	if (self == NULL) return false;
+	unidesc ud;
+	ud.i32 = self->fd;
+	return ClientUnidesc_getPeerAddress(ud, address);
 }
 
 bool ClientSocket_getLocalAddress(ClientSocket self, ClientSocketAddress address)
@@ -639,6 +650,18 @@ unidesc ClientSocket_getDescriptor(ClientSocket self)
 		return ret;
 	}
 	return Hal_getInvalidUnidesc();
+}
+
+void ClientSocket_setUserData(ClientSocket self, void *userData)
+{
+	if (self == NULL) return;
+	self->userData = userData;
+}
+
+void *ClientSocket_getUserData(ClientSocket self)
+{
+	if (self == NULL) return NULL;
+	return self->userData;
 }
 
 

@@ -223,6 +223,16 @@ FileSystem_deleteDirectory(const char *directoryName);
 HAL_API bool
 FileSystem_moveDirectory(const char *dirName, const char *newDirName);
 
+/**
+ * \brief get absolute file/dir path
+ *
+ * \param path
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+FileSystem_realPath(const char *path, char *realPath);
+
 /*! @} */
 
 /*! @} */

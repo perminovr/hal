@@ -97,6 +97,16 @@ UdpDgramSocket_joinGroup(DgramSocket self, const char *ip, const char *iface);
 HAL_API bool
 UdpDgramSocket_setReuse(DgramSocket self, bool reuse);
 
+/**
+ * \brief Control broadcast receiving ability
+ *
+ * \param enable true - enable ability, false - disable
+ * 
+ * \return true in case of success, false otherwise
+ */
+HAL_API bool
+UdpDgramSocket_controlBroadcast(DgramSocket self, bool enable);
+
 
 /**
  * \brief Create a local socket
@@ -128,6 +138,17 @@ LocalDgramSocket_unlinkAddress(const char *address);
  */
 HAL_API DgramSocket
 EtherDgramSocket_create(const char *iface, uint16_t ethTypeFilter);
+
+/**
+ * \brief Control promiscuous mode
+ *
+ * \param self the socket instance
+ * \param enable true - enable promiscuous mode; false - disable
+ * 
+ * \return true in case of success, false otherwise
+ */
+HAL_API bool
+EtherDgramSocket_promisc(DgramSocket self, bool enable);
 
 /**
  * \brief Set ethernet frame header
@@ -283,7 +304,7 @@ DgramSocket_readAvailable(DgramSocket self, bool fromRemote);
  * \param addr address of data source (protocol specific).
  * \param buf the buffer where the read bytes are copied to
  * \param size the maximum number of bytes to read (size of the provided buffer)
- * 
+ *
  * \return the number of bytes peeked or -1 if an error occurred
  */
 HAL_API int

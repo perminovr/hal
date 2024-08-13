@@ -126,6 +126,28 @@ Netsys_delIpAddr(Netsys self, const char *iface,
 		const char *ipaddr, const char *ipmask);
 
 /**
+ * \brief Add vlan link to the system 
+ *
+ * \param iface the ID of the Ethernet interface (number, name or ip address on the interface)
+ * \param vlanId vlan ID
+ * \param preferredName preferred name of the new interface 
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+Netsys_addVlan(Netsys self, const char *iface, uint16_t vlanId, const char *preferredName);
+
+/**
+ * \brief Delete link from the system 
+ *
+ * \param iface the ID of the Ethernet interface (number, name or ip address on the interface)
+ *
+ * \return true on success, false on error
+ */
+HAL_API bool
+Netsys_delLink(Netsys self, const char *iface);
+
+/**
  * \brief Control the system link
  *
  * \param iface the ID of the Ethernet interface (number, name or ip address on the interface)

@@ -27,7 +27,6 @@
 #include <string.h>
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
-#include <sys/io.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/select.h>
@@ -143,6 +142,15 @@ bool UdpDgramSocket_setReuse(DgramSocket self, bool reuse)
 	return true;
 }
 
+bool UdpDgramSocket_controlBroadcast(DgramSocket self, bool enable)
+{
+	if (self == NULL) return false;
+	int sockopt = (enable)? 1 : 0;
+	if (setsockopt(self->fd, SOL_SOCKET, SO_BROADCAST, &sockopt, sizeof(sockopt)) < 0) {
+		return false;
+	}
+	return true;
+}
 
 DgramSocket LocalDgramSocket_create(const char *address)
 {
@@ -183,14 +191,9 @@ void LocalDgramSocket_unlinkAddress(const char *address)
 
 static bool EtherDgramSocket_bind(int fd, int idx, const char *ifacename)
 {
-	struct packet_mreq mreq;
 	int sockopt = 1;
-	memset(&mreq, 0, sizeof(struct packet_mreq));
-	mreq.mr_ifindex = idx;
-	mreq.mr_type = PACKET_MR_PROMISC;
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(sockopt)) < 0) return false;
 	if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, ifacename, IFNAMSIZ-1) < 0) return false;
-	if (setsockopt(fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) return false;
 	return true;
 }
 
@@ -226,6 +229,17 @@ exit_error:
 	return NULL;
 }
 
+bool EtherDgramSocket_promisc(DgramSocket self, bool enable)
+{
+	if (self == NULL) return false;
+	struct packet_mreq mreq;
+	memset(&mreq, 0, sizeof(struct packet_mreq));
+	mreq.mr_ifindex = self->ifidx;
+	mreq.mr_type = PACKET_MR_PROMISC;
+	if (setsockopt(self->fd, SOL_PACKET, PACKET_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) return false;
+	return true;
+}
+
 int EtherDgramSocket_setHeader(uint8_t *header, const uint8_t *src, const uint8_t *dst, uint16_t ethType)
 {
 	if (header == NULL || src == NULL || dst == NULL) return -1;
@@ -240,12 +254,12 @@ int EtherDgramSocket_setHeader(uint8_t *header, const uint8_t *src, const uint8_
 
 void EtherDgramSocket_getHeader(const uint8_t *header, uint8_t *src, uint8_t *dst, uint16_t *ethType)
 {
-	if (header == NULL || src == NULL || dst == NULL || ethType == NULL) return;
-	memcpy(dst, header, ETH_ALEN);
+	if (header == NULL) return;
+	if (dst) memcpy(dst, header, ETH_ALEN);
 	header += ETH_ALEN;
-	memcpy(src, header, ETH_ALEN);
+	if (src) memcpy(src, header, ETH_ALEN);
 	header += ETH_ALEN;
-	*ethType = ntohs( *((uint16_t*)header) );
+	if (ethType) *ethType = ntohs( *((uint16_t*)header) );
 	header += 2;
 }
 

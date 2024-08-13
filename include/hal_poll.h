@@ -29,13 +29,14 @@ extern "C" {
 
 /* Maximum pollfd size */
 #define HAL_POLL_MAX	64
+#define HALPOLL_AUTO_REALLOC_STEP 16
 
 
 /* Event types that can be polled for.  These bits may be set in `events'
    to indicate the interesting event types; they will appear in `revents'
    to indicate the status of the file descriptor.  */
 #define HAL_POLLIN		0x001		/* There is data to read.  */
-#define HAL_POLLPRI		0x002		/* There is urgent data to read.  */
+#define HAL_POLLPRI		0x002		/* There is urgent data to read. Irq for ex */
 #define HAL_POLLOUT		0x004		/* Writing now will not block.  */
 
 /* Event types always implicitly polled for.  These bits need not be set in
@@ -45,6 +46,8 @@ extern "C" {
 #define HAL_POLLHUP		0x010		/* Hung up.  */
 #define HAL_POLLNVAL	0x020		/* Invalid polling request.  */
 
+#define HAL_POLL_FOREVER   -1
+#define HAL_POLL_NOWAIT    0
 
 /** Opaque reference of a Poll instance */
 typedef struct sPollfd *Pollfd;
@@ -250,6 +253,18 @@ HAL_API bool
 HalPoll_remove(HalPoll self, unidesc fd);
 
 /**
+ * \brief Move descriptor inside the poll queue based on priority
+ *
+ * \param self - a HalPoll instance
+ * \param fd - Unified system descriptor
+ * \param priority - 0..n-1 - descriptor position, -(n)..-1 - inverted position: -1 = n-1, -2 = n-2, ..,  -n = 0
+ *
+ * \return true in case of moving done
+*/
+HAL_API bool
+HalPoll_updatePriority(HalPoll self, unidesc fd, int priority);
+
+/**
  * \brief Remove all descriptors from poll queue
 */
 HAL_API void
@@ -267,6 +282,14 @@ HAL_API int
 HalPoll_wait(HalPoll self, int timeout);
 
 /**
+ * \brief Break HalPoll_wait callbacks calling cycle
+ *
+ * \param self - a HalPoll instance
+*/
+HAL_API void
+HalPoll_breakEventCycle(HalPoll self);
+
+/**
  * \brief Resize HalPoll object
  *
  * \param maxSize - maximum available size for descriptors in the poll queue
@@ -282,6 +305,15 @@ HalPoll_size(HalPoll self);
 
 HAL_API int
 HalPoll_maxSize(HalPoll self);
+
+/**
+ * \brief Enable or disable auto realloc on update 
+ * if there is no memory for the new object
+ *
+ * \param self - a HalPoll instance
+*/
+HAL_API void
+HalPoll_setAutoRealloc(HalPoll self, bool enable);
 
 /**
  * \brief Destroy HallPoll instance

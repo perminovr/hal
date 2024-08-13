@@ -100,6 +100,12 @@ Timer_destroy(Timer self);
 HAL_API unidesc
 Timer_getDescriptor(Timer self);
 
+/**
+ * \brief Return timer status
+*/
+HAL_API bool
+Timer_isRunning(Timer self);
+
 
 /**
  * \brief Set single shot timeout without Timer instance

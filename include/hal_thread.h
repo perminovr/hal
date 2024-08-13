@@ -33,7 +33,7 @@ typedef void *Semaphore;
 /** Qpaque reference of a Mutex instance */
 typedef void *Mutex;
 
-/** Qpaque reference of a Mutex instance */
+/** Qpaque reference of a RwLock instance */
 typedef void *RwLock;
 
 /** Opaque reference of a Thread instance */
@@ -73,7 +73,7 @@ public:
  * \return the newly created Thread instance
  */
 HAL_API Thread
-Thread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy);
+HalThread_create(size_t stackSize, ThreadExecutionFunction function, void *parameter, bool autodestroy);
 
 /**
  * \brief Start a Thread.
@@ -84,7 +84,13 @@ Thread_create(size_t stackSize, ThreadExecutionFunction function, void *paramete
  * \param thread the Thread instance to start
  */
 HAL_API void
-Thread_start(Thread thread);
+HalThread_start(Thread thread);
+
+/**
+ * \brief Join the thread
+ */
+HAL_API void
+HalThread_join(Thread thread);
 
 /**
  * \brief Destroy a Thread and free all related resources.
@@ -92,149 +98,158 @@ Thread_start(Thread thread);
  * \param thread the Thread instance to destroy
  */
 HAL_API void
-Thread_destroy(Thread thread);
+HalThread_destroy(Thread thread);
 
 /**
  * \brief Suspend execution of the Thread for the specified number of milliseconds
  */
 HAL_API void
-Thread_sleep(int millies);
+HalThread_sleep(int millies);
 
 /**
  * \brief Switch executing thread
  */
 HAL_API void
-Thread_yield(void);
+HalThread_yield(void);
 
 /**
  * \brief Send cancel signal to the thread
  */
 HAL_API void
-Thread_cancel(Thread thread);
+HalThread_cancel(Thread thread);
 
 /**
  * \brief Check for cancel condition on the thread
  */
 HAL_API void
-Thread_testCancel(Thread thread);
+HalThread_testCancel(Thread thread);
 
 /**
- * \brief Get signal that will be raised on \ref Thread_cancel call
+ * \brief Get signal that will be raised on \ref HalThread_cancel call
  * \details the signal shoud be polled
  */
 HAL_API Signal
-Thread_getCancelSignal(Thread thread);
+HalThread_getCancelSignal(Thread thread);
 
 /**
  * \brief Send pause signal to the thread
  */
 HAL_API void
-Thread_pause(Thread thread);
+HalThread_pause(Thread thread);
 
 /**
  * \brief Resume the thread
  */
 HAL_API void
-Thread_resume(Thread thread);
+HalThread_resume(Thread thread);
 
 /**
  * \brief Check for pause condition on the thread
  */
 HAL_API void
-Thread_testPause(Thread thread);
+HalThread_testPause(Thread thread);
 
 /**
- * \brief Get signal that will be raised on \ref Thread_pause call
+ * \brief Get signal that will be raised on \ref HalThread_pause call
  */
 HAL_API Signal
-Thread_getPauseSignal(Thread thread);
+HalThread_getPauseSignal(Thread thread);
 
 /**
  * \brief Set thread name
  */
 HAL_API void
-Thread_setName(Thread thread, const char *name);
+HalThread_setName(Thread thread, const char *name);
 
 /**
  * \brief Return native system descriptor
  */
 HAL_API unidesc
-Thread_getNativeDescriptor(Thread thread);
+HalThread_getNativeDescriptor(Thread thread);
+
+/**
+ * \brief Return current thread native system descriptor
+ */
+HAL_API unidesc
+HalThread_getCurrentThreadNativeDescriptor(void);
 
 
 HAL_API Semaphore
-Semaphore_create(int initialValue);
+HalSemaphore_create(int initialValue);
 
 /* Wait until semaphore value is greater than zero. Then decrease the semaphore value. */
 HAL_API void
-Semaphore_wait(Semaphore self);
+HalSemaphore_wait(Semaphore self);
 
 HAL_API void
-Semaphore_post(Semaphore self);
+HalSemaphore_post(Semaphore self);
 
 HAL_API void
-Semaphore_destroy(Semaphore self);
+HalSemaphore_destroy(Semaphore self);
 
 
 HAL_API Mutex
-Mutex_create(void);
+HalMutex_create(void);
 
 HAL_API void
-Mutex_lock(Mutex self);
+HalMutex_lock(Mutex self);
 
 HAL_API int
-Mutex_trylock(Mutex self);
+HalMutex_trylock(Mutex self);
 
 /* Wait until lock becomes available, or specified time passes. */
 HAL_API int
-Mutex_timedlock(Mutex self, int millies);
+HalMutex_timedlock(Mutex self, int millies);
 
 HAL_API void
-Mutex_unlock(Mutex self);
+HalMutex_unlock(Mutex self);
 
 HAL_API void
-Mutex_destroy(Mutex self);
+HalMutex_destroy(Mutex self);
 
 
 HAL_API RwLock
-RwLock_create(void);
+HalRwLock_create(void);
 
 HAL_API void
-RwLock_wlock(RwLock self);
+HalRwLock_wlock(RwLock self);
 
 HAL_API void
-RwLock_rlock(RwLock self);
+HalRwLock_rlock(RwLock self);
 
 HAL_API void
-RwLock_unlock(RwLock self);
+HalRwLock_unlock(RwLock self);
 
 HAL_API void
-RwLock_destroy(RwLock self);
+HalRwLock_destroy(RwLock self);
 
 
 #define SmartMutex Mutex
-#define SmartMutex_create Mutex_create
-#define SmartMutex_lock Mutex_lock
-#define SmartMutex_unlock Mutex_unlock
+#define SmartHalMutex_create HalMutex_create
+#define SmartHalMutex_lock HalMutex_lock
+#define SmartHalMutex_unlock HalMutex_unlock
 
 
 HAL_API Signal
-Signal_create(void);
+HalSignal_create(void);
 
 HAL_API void
-Signal_raise(Signal self);
+HalSignal_raise(Signal self);
 
 HAL_API void
-Signal_end(Signal self);
+HalSignal_end(Signal self);
 
 HAL_API bool
-Signal_event(Signal self);
+HalSignal_event(Signal self);
+
+HAL_API void 
+HalSignal_wait(Signal self);
 
 HAL_API void
-Signal_destroy(Signal self);
+HalSignal_destroy(Signal self);
 
 HAL_API unidesc
-Signal_getDescriptor(Signal self);
+HalSignal_getDescriptor(Signal self);
 
 
 /*! @} */

@@ -295,7 +295,13 @@ int SerialPort_write(SerialPort self, uint8_t *buffer, int bufSize)
 	if (self->fd == -1) return -1;
 	self->lastError = SERIAL_PORT_ERROR_NONE;
 	ssize_t result = write(self->fd, buffer, bufSize);
-	tcdrain(self->fd);
+	return result;
+}
+
+int SerialPort_writeAndWait(SerialPort self, uint8_t *buffer, int bufSize)
+{
+	ssize_t result = SerialPort_write(self, buffer, bufSize);
+	if (result > 0) { tcdrain(self->fd); }
 	return result;
 }
 

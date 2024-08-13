@@ -79,6 +79,12 @@
 # endif
 #endif
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /**
  * \brief Unified system descriptor
  */
@@ -114,5 +120,11 @@ Hal_unidescIsInvalid(unidesc p);
  */
 HAL_API bool
 Hal_unidescIsEqual(const unidesc *p1, const unidesc *p2);
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif /* HAL_BASE_H */

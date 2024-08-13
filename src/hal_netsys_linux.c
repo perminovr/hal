@@ -366,6 +366,60 @@ bool Netsys_delIpAddr(Netsys self, const char *iface,
 	return mnltalk(self, nlh, NULL);
 }
 
+bool Netsys_addVlan(Netsys self, const char *iface, uint16_t vlanId, const char *preferredName)
+{
+	if (!self) return false;
+	if (!iface) return false;
+	if (!vlanId || vlanId > 4095) return false;
+	int idx;
+	char sysiface[16];
+	char vlaniface[32];
+	if (!NetwHlpr_interfaceInfo(iface, &idx, sysiface, NULL, NULL)) return false;
+
+	if (preferredName == NULL) {
+		sprintf(vlaniface, "%s_v%u", sysiface, vlanId);
+		preferredName = vlaniface;
+	}
+
+	struct nlmsghdr *nlh;
+	struct ifinfomsg *ifm;
+	struct nlattr *linfo, *linfodata;
+	nlh = mnl_nlmsg_put_header(self->buf);
+	nlh->nlmsg_type	= RTM_NEWLINK;
+	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE | NLM_F_ACK;
+	ifm = (struct ifinfomsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifinfomsg));
+	ifm->ifi_family = AF_UNSPEC;
+	ifm->ifi_change |= IFF_UP;
+	ifm->ifi_flags |= IFF_UP;
+	mnl_attr_put_str(nlh, IFLA_IFNAME, preferredName);
+	mnl_attr_put_u32(nlh, IFLA_LINK, idx);
+	linfo = mnl_attr_nest_start(nlh, IFLA_LINKINFO);
+	mnl_attr_put_str(nlh, IFLA_INFO_KIND, "vlan");
+	linfodata = mnl_attr_nest_start(nlh, IFLA_INFO_DATA);
+	mnl_attr_put_u32(nlh, IFLA_VLAN_ID, vlanId);
+	mnl_attr_nest_end(nlh, linfodata);
+	mnl_attr_nest_end(nlh, linfo);
+	return mnltalk(self, nlh, NULL);
+}
+
+bool Netsys_delLink(Netsys self, const char *iface)
+{
+	if (!self) return false;
+	if (!iface) return false;
+	char sysiface[16];
+	if (!NetwHlpr_interfaceInfo(iface, NULL, sysiface, NULL, NULL)) return false;
+
+	struct nlmsghdr *nlh;
+	struct ifinfomsg *ifm;
+	nlh = mnl_nlmsg_put_header(self->buf);
+	nlh->nlmsg_type	= RTM_DELLINK;
+	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_REPLACE | NLM_F_ACK;
+	ifm = (struct ifinfomsg *)mnl_nlmsg_put_extra_header(nlh, sizeof(struct ifinfomsg));
+	ifm->ifi_family = AF_UNSPEC;
+	mnl_attr_put_str(nlh, IFLA_IFNAME, sysiface);
+	return mnltalk(self, nlh, NULL);
+}
+
 
 bool Netsys_controlLink(Netsys self, const char *iface, bool up, bool promisc)
 {
@@ -595,6 +649,14 @@ Netsys_addIpAddr(Netsys self, const char *iface,
 bool
 Netsys_delIpAddr(Netsys self, const char *iface,
 		const char *ipaddr, const char *ipmask)
+{ return false; }
+
+bool
+Netsys_addVlan(Netsys self, const char *iface, uint16_t vlanId, const char *preferredName)
+{ return false; }
+
+bool
+Netsys_delLink(Netsys self, const char *iface)
 { return false; }
 
 bool
